@@ -3798,7 +3798,7 @@ system-dialect: make-profilable context [
 		/loaded 										;-- source code is already in LOADed format
 			job-data [block!]
 		/local
-			comp-time link-time err output src resources icon
+			comp-time link-time err output src resources icon completed-date-time
 	][
 		comp-time: dt [
 			unless block? files [files: reduce [files]]
@@ -3896,11 +3896,15 @@ system-dialect: make-profilable context [
 		if any [opts/link? not opts/dev-mode?][clean-up]
 		set-verbose-level 0
 
+		completed-date-time: copy ""
+		append append append completed-date-time now/date " " now/time
+		
 		reduce [
 			comp-time
 			link-time
 			any [all [job/buffer length? job/buffer] 0]
 			output
+			completed-date-time
 		]
 	]
 ]
