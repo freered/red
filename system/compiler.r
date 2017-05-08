@@ -2880,43 +2880,37 @@ system-dialect: make-profilable context [
 			]
 		]
 		
-		get-caller: func [name /root /local list found? stk][
+		get-caller: func [name [word!] /root /local list found? stk][
 			stk: exclude expr-call-stack [as #body #test]
 			if tail? next stk [return none]
 			
-			list: back back find stk name
+			list: back find stk name
 			unless root [return any [all [find calling-keywords list/1 none] list/1]]
 			
 			while [found?: find calling-keywords list/1][list: back list]
 			all [not found? not tail? next list list/1]
 		]
-
-		comp-call: func [
-			name [word!] args [block!]
-			/sub										;FIXME: never used!
-			/local
-				list type res align? left right dup var-arity? saved? arg expr spec fspec
-				ret-value? types slots caller
-		][
-			name: decorate-fun name
-			list: either issue? args/1 [				;-- bypass type-checking for variable arity calls
-				args/2
-			][
-				check-arguments-type name args
-				args
+		
+		pass-struct-pointer?: func [spec [block!] slots [integer!]][
+			all [
+				spec/2 = 'import						 ;-- system ABI is enforced on imports only
+				spec/3 = 'cdecl							 ;-- stdcall applies to R/S or Windows ABI
+				any [
+					all [1 < slots job/target = 'ARM]	 ;-- ARM requires it only for struct > 4 bytes
+					all [
+						not find [Windows MacOSX] job/OS ;-- fallback on Linux ABI
+						job/target <> 'ARM
+					]
+				]
 			]
-			spec: functions/:name
-			
-			;-- returned struct by value handling --
+		]
+		
+		process-returned-struct: func [name [word!] spec [block!] args [block!] /local alloc? slots caller][
 			if all [
 				slots: emitter/struct-slots?/check spec/4
 				any [
-					2 < slots
-					all [
-						spec/2 = 'import
-						spec/3 = 'cdecl
-						not find [Windows MacOSX] job/OS  ;-- fallback on Linux ABI
-					]
+					2 < slots							;-- R/S and Windows ABI
+					pass-struct-pointer? spec slots		;-- check other cases
 				]
 			][
 				unless caller: get-caller name [
@@ -2926,14 +2920,14 @@ system-dialect: make-profilable context [
 						any [get-caller/root name 'args-top] ;-- 'args-top is just for routing in SWITCH 
 					]
 				]
-				insert/only list switch/default type?/word caller [
+				insert/only args switch/default type?/word caller [
 					none!	  [<ret-ptr>]
 					set-word! [
 						unless get-variable-spec to word! caller [
 							backtrack caller
 							throw-error "variable not declared"
 						]
-						bind to word! caller caller
+						bind to word! caller caller		;-- binding for future shadow objects support  
 					]
 					set-path! [
 						unless get-variable-spec caller/1 [
@@ -2943,15 +2937,30 @@ system-dialect: make-profilable context [
 						to path! caller
 					]
 					word!	  [
+						alloc?: yes
 						emitter/target/emit-reserve-stack slots
-						ret-value?: to tag! emitter/arguments-size? spec/4
+						to tag! emitter/arguments-size? spec/4
 					]
 				][
 					throw-error ["comp-call error: (should not happen) bad caller type:" mold caller]
 				]
 			]
-			;--
-			
+			all [alloc? slots]							;-- return slots allocated on stack, or none
+		]
+
+		comp-call: func [
+			name [word!] args [block!]
+			/local
+				list type res align? left right dup var-arity? saved? arg expr spec fspec
+				types slots
+		][
+			name: decorate-fun name
+			list: either issue? args/1 [args/2][		;-- bypass type-checking for variable arity calls
+				check-arguments-type name args
+				args
+			]
+			spec: functions/:name
+			slots: process-returned-struct name spec list	
 			order-args name list						;-- reorder argument according to cconv
 			
 			align?: all [
@@ -3006,7 +3015,7 @@ system-dialect: make-profilable context [
 			]
 			if all [user-code? spec/2 <> 'import][libRedRT/collect-extra name]
 			
-			res: emitter/target/emit-call name args to logic! sub
+			res: emitter/target/emit-call name args
 
 			either res [
 				last-type: res
@@ -3014,7 +3023,7 @@ system-dialect: make-profilable context [
 				set-last-type functions/:name/4			;-- catch nested calls return type
 			]
 			if align? [emitter/target/emit-stack-align-epilog args]
-			if ret-value? [emitter/target/emit-release-stack slots]
+			if slots  [emitter/target/emit-release-stack slots]
 			res
 		]
 				
@@ -3219,9 +3228,7 @@ system-dialect: make-profilable context [
 					'value = last last-type				;-- for a struct passed by value
 					word? expr/1
 					spec: select functions expr/1
-					spec/2 = 'import
-					spec/3 = 'cdecl
-					not find [Windows MacOSX] job/OS	;-- for Linux OS (and derivatives)
+					pass-struct-pointer? spec emitter/struct-slots?/check spec/4
 					store?: no							;-- avoid emitting assignment code
 				]
 				if all [
