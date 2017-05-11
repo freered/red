@@ -858,6 +858,7 @@ call: make native! [[
 		return:		[integer!]				"0 if success, -1 if error, or a process ID"
 	]
 	#get-definition NAT_CALL
+]
 
 detab: make native! [[
 		"Converts tabs in a string to spaces. (tab size 4)"
