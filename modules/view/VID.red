@@ -52,7 +52,7 @@ system/view/VID: context [
 			][
 				min-sz: 0x0
 				foreach txt data [
-					if string? txt [min-sz: max min-sz size-text/with face txt]
+					if any-string? txt [min-sz: max min-sz size-text/with face as string! txt]
 				]
 				if all [face/text face/type <> 'drop-list][
 					min-sz: max min-sz size-text face
@@ -88,7 +88,7 @@ system/view/VID: context [
 		axis: pick [y x] dir = 'across
 		foreach face pane [
 			offset: max-sz - face/size/:axis
-			if find [center middle] align [offset: offset / 2]
+			if find [center middle] align [offset: to integer! round offset / 2.0]
 			face/offset/:axis: face/offset/:axis + offset
 		]
 	]
@@ -166,6 +166,8 @@ system/view/VID: context [
 		value
 	]
 	
+	fetch-expr: func [code [word!]][do/next next get code code]
+	
 	fetch-options: function [
 		face [object!] opts [object!] style [block!] spec [block!] css [block!]
 		/extern focal-face
@@ -189,7 +191,7 @@ system/view/VID: context [
 				| ['top  | 'middle | 'bottom]	 (opt?: add-flag opts 'para 'v-align value)
 				| ['bold | 'italic | 'underline] (opt?: add-flag opts 'font 'style value)
 				| 'extra	  (opts/extra: fetch-value spec: next spec)
-				| 'data		  (opts/data: fetch-value spec: next spec)
+				| 'data		  (opts/data: fetch-expr 'spec spec: back spec)
 				| 'draw		  (opts/draw: process-draw fetch-argument block! spec)
 				| 'font		  (opts/font: make any [opts/font font!] fetch-argument obj-spec! spec)
 				| 'para		  (opts/para: make any [opts/para para!] fetch-argument obj-spec! spec)
@@ -424,7 +426,7 @@ system/view/VID: context [
 				]
 				space	[spacing: fetch-argument pair! spec]
 				origin	[origin: cursor: fetch-argument pair! spec]
-				at		[at-offset: fetch-argument pair! spec]
+				at		[at-offset: fetch-expr 'spec spec: back spec]
 				pad		[cursor: cursor + fetch-argument pair! spec]
 				do		[do-safe bind fetch-argument block! spec panel]
 				return	[either divides [throw-error spec][do reset]]

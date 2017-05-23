@@ -503,8 +503,11 @@ make-event: func [
 		default	 [0]
 	]
 
-	stack/mark-native words/_anon
-	#call [system/view/awake gui-evt]
+	stack/mark-try-all words/_anon
+	catch CATCH_ALL_EXCEPTIONS [
+		#call [system/view/awake gui-evt]
+	]
+	if system/thrown <> 0 [system/thrown: 0]
 	stack/unwind
 
 	res: as red-word! stack/arguments
@@ -660,7 +663,7 @@ paint-background: func [
 	hDC		[handle!]
 	return: [logic!]
 	/local
-		rect   [RECT_STRUCT]
+		rect   [RECT_STRUCT value]
 		hBrush [handle!]
 		color  [integer!]
 ][
@@ -668,7 +671,6 @@ paint-background: func [
 	if color = -1 [return false]
 
 	hBrush: CreateSolidBrush color
-	rect: declare RECT_STRUCT
 	GetClientRect hWnd rect
 	FillRect hDC rect hBrush
 	DeleteObject hBrush
@@ -882,8 +884,10 @@ WndProc: func [
 		type   [integer!]
 		pos	   [integer!]
 		handle [handle!]
+		rc	   [RECT_STRUCT value]
 		values [red-value!]
 		font   [red-object!]
+		parent [red-object!]
 		draw   [red-block!]
 		brush  [handle!]
 		nmhdr  [tagNMHDR]
@@ -1048,6 +1052,15 @@ WndProc: func [
 				render-base hWnd as handle! wParam
 			][
 				return 1
+			]
+			parent: as red-object! values + FACE_OBJ_PARENT
+			if TYPE_OF(parent) = TYPE_OBJECT [
+				w-type: as red-word! get-node-facet parent/ctx FACE_OBJ_TYPE
+				if tab-panel = symbol/resolve w-type/symbol [
+					GetClientRect hWnd rc
+					FillRect as handle! wParam rc GetSysColorBrush COLOR_WINDOW
+					return 1
+				]
 			]
 		]
 		WM_PAINT [
@@ -1241,11 +1254,10 @@ do-events: func [
 	no-wait? [logic!]
 	return:  [logic!]
 	/local
-		msg	  [tagMSG]
+		msg	  [tagMSG value]
 		state [integer!]
 		msg?  [logic!]
 ][
-	msg: declare tagMSG
 	msg?: no
 	exit-loop: 0
 	
