@@ -860,6 +860,14 @@ call: make native! [[
 	#get-definition NAT_CALL
 ]
 
+size?: make native! [[
+		"Returns the size of a file content"
+		file 	[file!]
+		return: [integer! none!]
+	]
+	#get-definition NAT_SIZE?
+]
+
 detab: make native! [[
 		"Converts tabs in a string to spaces. (tab size 4)"
 		string		[any-string! char!]
