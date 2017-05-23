@@ -1737,6 +1737,22 @@ natives: context [
 		ret/header: TYPE_LOGIC
 		ret
 	]
+	
+	size?*: func [
+		check?  [logic!]
+		/local
+			name [red-file!]
+			fd	 [integer!]
+	][
+		name: as red-file! stack/arguments
+		fd: simple-io/open-file file/to-OS-path name simple-io/RIO_READ yes
+		either fd < 0 [
+			none/push-last
+		][
+			integer/box simple-io/file-size? fd
+			simple-io/close-file fd
+		]
+	]
 
 	log-2*: func [
 		check? [logic!]
@@ -3142,7 +3158,7 @@ natives: context [
 		table: as int-ptr! allocate NATIVES_NB * size? integer!
 		buffer-blk: block/make-in red/root 32			;-- block buffer for PRIN's reduce/into
 
-		register [
+		register [ 
 			:if*
 			:unless*
 			:either*
@@ -3239,7 +3255,8 @@ natives: context [
 			:as*
 			:call*
 			:zero?*
-      :detab*
+			:size?*
+			:detab*
 			:entab*
 		]
 	]
