@@ -264,13 +264,10 @@ set-defaults: func [][
 	objc_msgSend [default-font sel_getUid "retain"]
 ]
 
-set-metrics: func [
-	/local
-		m	[red-hash!]
-		blk [red-block!]
-][
-	m: as red-hash! #get system/view/metrics
-	map/put m as red-value! _dpi as red-value! integer/push log-pixels-x no
+get-metrics: func [][
+	copy-cell 
+		as red-value! integer/push log-pixels-x
+		#get system/view/metrics/dpi
 ]
 
 init: func [
@@ -338,7 +335,7 @@ init: func [
 	objc_msgSend [NSApp sel_getUid "setActivationPolicy:" 0]
 	objc_msgSend [NSApp sel_getUid "finishLaunching"]
 
-	set-metrics
+	get-metrics
 ]
 
 set-logic-state: func [
@@ -593,25 +590,35 @@ change-color: func [
 	color	[red-tuple!]
 	type	[integer!]
 	/local
-		clr [integer!]
+		clr  [integer!]
+		set? [logic!]
 ][
 	if TYPE_OF(color) <> TYPE_TUPLE [exit]
 	if transparent-color? color [
 		objc_msgSend [hWnd sel_getUid "setDrawsBackground:" no]
 		exit
 	]
-	either any [type = field type = text type = area type = window][
-		clr: to-NSColor color
-		if type = area [
+	set?: yes
+	case [
+		type = area [
 			hWnd: objc_msgSend [hWnd sel_getUid "documentView"]
 			set-caret-color hWnd color/array1
 		]
-		if type = text [
+		type = text [
 			objc_msgSend [hWnd sel_getUid "setDrawsBackground:" yes]
 		]
+		any [type = check type = radio][
+			hWnd: objc_msgSend [hWnd sel_getUid "cell"]
+		]
+		any [type = field type = window][0]				;-- no special process
+		true [
+			set?: no
+			objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]
+		]
+	]
+	if set? [
+		clr: to-NSColor color
 		objc_msgSend [hWnd sel_getUid "setBackgroundColor:" clr]
-	][
-		objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]
 	]
 ]
 
