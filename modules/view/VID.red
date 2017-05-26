@@ -17,6 +17,8 @@ system/view/VID: context [
 	reactors:	make block! 20
 	debug?: 	no
 	
+	containers: [panel tab-panel group-box]
+	
 	default-font: [
 		name	system/view/fonts/system
 		size	system/view/fonts/size
@@ -57,7 +59,7 @@ system/view/VID: context [
 				if all [face/text face/type <> 'drop-list][
 					min-sz: max min-sz size-text face
 				]
-				min-sz + 24x0							;@@ hardcoded offset for scrollbar
+				min-sz + any [system/view/metrics/misc/scroller 0x0]
 			]
 			all [face/type = 'area string? face/text not empty? face/text][
 				len: 0
@@ -298,20 +300,26 @@ system/view/VID: context [
 		
 		if block? face/actors [face/actors: make object! face/actors]
 
-		all [
+		;-- size adjustments --
+		all [											;-- account for hard paddings
 			pad: select system/view/metrics/paddings face/type
 			pad: as-pair pad/1/x + pad/1/y pad/2/x + pad/2/y
 		]
-		if all [
-			any [opts/size-x not opts/size not find words 'size]
-			any [face/text face/data]
-		][
-			min-sz: (calc-size face) + any [pad 0x0]
-			
+		if any [opts/size-x not opts/size not find words 'size][
+			sz: any [face/size 0x0]
+			min-sz: either find containers face/type [sz][
+				(any [pad 0x0]) + any [
+					all [
+						any [face/text series? face/data]
+						calc-size face
+					]
+					sz
+				]
+			]
 			face/size: either opts/size-x [				;-- x size provided by user
-				as-pair opts/size-x max face/size/y min-sz/y
+				as-pair opts/size-x max sz/y min-sz/y
 			][
-				max face/size min-sz
+				max sz min-sz
 			]
 		]
 		all [											;-- account for hard margins
@@ -372,7 +380,7 @@ system/view/VID: context [
 		global?: 	  yes								;-- TRUE: panel options expected
 		below?: 	  no
 		
-		bound: cursor: origin: spacing: pick [0x0 10x10] tight
+		top-left: bound: cursor: origin: spacing: pick [0x0 10x10] tight
 		
 		opts: object [
 			type: offset: size: size-x: text: color: enable?: visible?: selected: image: 
@@ -417,6 +425,14 @@ system/view/VID: context [
 			panel: make face! system/view/VID/styles/window/template  ;-- absolute path to avoid clashing with /styles
 		]
 		
+		any [
+			all [										;-- account for container's hard paddings
+				svmp: select system/view/metrics/paddings panel/type ;-- top-left padding
+				bound: cursor: origin: origin + pad: as-pair svmp/1/x svmp/2/x
+			]
+			pad: 0x0
+		]
+		
 		if debug? [append panel/draw: make block! 30 [pen red]]
 		
 		while [all [global? not tail? spec]][			;-- process wrapping panel options
@@ -455,7 +471,7 @@ system/view/VID: context [
 					max-sz: 0
 				]
 				space	[spacing: fetch-argument pair! spec]
-				origin	[origin: cursor: fetch-argument pair! spec]
+				origin	[origin: cursor: pad + top-left: fetch-argument pair! spec]
 				at		[at-offset: fetch-expr 'spec spec: back spec]
 				pad		[cursor: cursor + fetch-argument pair! spec]
 				do		[do-safe bind fetch-argument block! spec panel]
@@ -531,6 +547,11 @@ system/view/VID: context [
 							face/offset/:axis: list/:index/offset/:axis
 						]
 					]
+					all [								;-- account for hard margins
+						mar: select system/view/metrics/margins face/type
+						face/offset: face/offset - as-pair mar/1/x mar/2/x
+					]
+					
 					append list face
 					if name [set name face]
 					pane-size: max pane-size face/offset + face/size + spacing
@@ -545,7 +566,13 @@ system/view/VID: context [
 			unless only [panel/pane: list]
 		]
 		either size [panel/size: size][
-			if pane-size <> 0x0 [panel/size: pane-size - spacing + origin]
+			if pane-size <> 0x0 [
+				if svmp [
+					pad2: as-pair svmp/1/y svmp/2/y		;-- bottom-right padding
+					origin: either top-left = pad [pad2][max top-left pad2]
+				]
+				panel/size: pane-size - spacing + origin
+			]
 		]
 		if image: panel/image [panel/size: max panel/size image/size]
 
