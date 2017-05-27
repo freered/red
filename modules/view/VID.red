@@ -63,8 +63,12 @@ system/view/VID: context [
 			]
 			all [face/type = 'area string? face/text not empty? face/text][
 				len: 0
-				parse mark: face/text [
-					any [s: to [CR | end] e: (if len < new: offset? s e [len: new mark: s]) opt LF skip]
+				parse mark: face/text [					;-- find the longest line
+					any [
+						s: thru [CR | LF | end] e:
+						(if len < new: offset? s e [len: new mark: s])
+						opt LF skip
+					]
 				]
 				size-text/with face copy/part mark len
 			]
@@ -174,6 +178,7 @@ system/view/VID: context [
 		obj-spec!:	make typeset! [block! object!]
 		rate!:		make typeset! [integer! time!]
 		color!:		make typeset! [tuple! issue!]
+		cursor!:	make typeset! [word! lit-word! image!]
 		
 		set opts none
 		
@@ -206,6 +211,7 @@ system/view/VID: context [
 				| 'no-border  (set-flag opts 'flags 'no-border)
 				| 'space	  (opt?: no)				;-- avoid wrongly reducing that word
 				| 'hint	  	  (add-option opts compose [hint: (fetch-argument string! spec)])
+				| 'cursor	  (add-option opts compose [cursor: (pre-load fetch-argument cursor! spec)])
 				| 'init		  (opts/init: fetch-argument block! spec)
 				| 'react	  (
 					if later?: spec/2 = 'later [spec: next spec]

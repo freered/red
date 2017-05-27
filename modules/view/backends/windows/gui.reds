@@ -13,6 +13,7 @@ Red/System [
 ;; ===== Extra slots usage in Window structs =====
 ;;
 ;;		-60 :							<- TOP
+;;		-28 : Cursor handle
 ;;		-24 : Direct2D target interface
 ;;				base-layered: caret's owner handle
 ;;		-20 : evolved-base-layered: child handle
@@ -1030,21 +1031,46 @@ evolve-base-face: func [
 	hWnd
 ]
 
-set-cursor: func [
+parse-common-opts: func [
 	hWnd	[handle!]
-	cursor	[red-word!]
+	options [red-block!]
 	/local
-		sym [integer!]
-		cur [integer!]
+		word	[red-word!]
+		w		[red-word!]
+		img		[red-image!]
+		len		[integer!]
+		sym		[integer!]
 ][
-	if TYPE_OF(cursor) = TYPE_WORD [
-		sym: symbol/resolve cursor/symbol
-		cur: case [
-			sym = _I-beam [IDC_IBEAM]
-			sym = _hand	  [32649]			;-- IDC_HAND
-			true		  [IDC_ARROW]
+	SetWindowLong hWnd wc-offset - 28 0
+	if TYPE_OF(options) = TYPE_BLOCK [
+		word: as red-word! block/rs-head options
+		len: block/rs-length? options
+		if len % 2 <> 0 [exit]
+		while [len > 0][
+			sym: symbol/resolve word/symbol
+			case [
+				sym = _cursor [
+					w: word + 1
+					either TYPE_OF(w) = TYPE_IMAGE [
+						img: as red-image! w
+						GdipCreateHICONFromBitmap as-integer img/node :sym
+					][
+						sym: symbol/resolve w/symbol
+						sym: case [
+							sym = _I-beam [IDC_IBEAM]
+							sym = _hand	  [32649]			;-- IDC_HAND
+							sym = _help   [32651]
+							true		  [IDC_ARROW]
+						]
+						sym: as-integer LoadCursor null sym
+					]
+					SetWindowLong hWnd wc-offset - 28 sym
+				]
+				true [0]
+			]
+			word: word + 2
+			len: len - 2
 		]
-		;setClassLong hWnd -12 as-integer LoadCursor null cur
 	]
 ]
 
@@ -1289,6 +1315,7 @@ OS-make-view: func [
 	;-- store the face value in the extra space of the window struct
 	assert TYPE_OF(face) = TYPE_OBJECT					;-- detect corruptions caused by CreateWindow unwanted events
 	store-face-to-hWnd handle face
+	parse-common-opts handle as red-block! values + FACE_OBJ_OPTIONS
 
 	;-- extra initialization
 	case [
