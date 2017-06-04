@@ -589,9 +589,22 @@ get-metrics: func [
 		#get system/view/metrics/dpi
 	
 	svm: as red-hash! #get system/view/metrics/misc
+	
 	map/put svm as red-value! _scroller as red-value! pair/push
 		GetSystemMetrics 2								;-- SM_CXVSCROLL
 		GetSystemMetrics 20								;-- SM_CYVSCROLL
+		no
+		
+	map/put 
+		as red-hash! #get system/view/metrics/colors
+		as red-value! _window as red-value! tuple/push
+			3 (GetSysColor 5) 0 0							;-- COLOR_WINDOW
+		no
+		
+	map/put 
+		as red-hash! #get system/view/metrics/colors
+		as red-value! _panel as red-value! tuple/push
+			3 (GetSysColor 15) 0 0							;-- COLOR_3DFACE
 		no
 ]
 
@@ -1303,8 +1316,8 @@ OS-make-view: func [
 		flags
 		offset/x
 		offset/y
-		sz-x
-		sz-y
+		size/x
+		size/y
 		as int-ptr! parent
 		as handle! id
 		hInstance
@@ -1397,14 +1410,29 @@ change-size: func [
 	size [red-pair!]
 	type [integer!]
 	/local
-		cx	[integer!]
-		cy	[integer!]
-		max [integer!]
-		msg [integer!]
+		cx		[integer!]
+		cy		[integer!]
+		max		[integer!]
+		msg		[integer!]
+		layer?	[logic!]
+		values	[red-value!]
+		pos		[red-pair!]
 ][
 	cx: 0
 	cy: 0
 	if type = window [window-border-info? hWnd null null :cx :cy]
+
+	layer?: all [
+		not win8+?
+		type = base
+		0 <> (WS_EX_LAYERED and GetWindowLong hWnd GWL_EXSTYLE)
+	]
+
+	if layer? [
+		values: get-face-values hWnd
+		pos: as red-pair! values + FACE_OBJ_OFFSET
+		process-layered-region hWnd size pos as red-block! values + FACE_OBJ_PANE pos null layer?
+	]
 
 	SetWindowPos 
 		hWnd
@@ -1413,11 +1441,7 @@ change-size: func [
 		size/x + cx size/y + cy
 		SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE
 
-	if all [
-		not win8+?
-		type = base
-		0 <> (WS_EX_LAYERED and GetWindowLong hWnd GWL_EXSTYLE)
-	][
+	if layer? [
 		hWnd: as handle! GetWindowLong hWnd wc-offset - 20
 		if hWnd <> null [change-size hWnd size -1]
 	]

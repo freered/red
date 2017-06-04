@@ -296,6 +296,8 @@ system/view/platform: context [
 			on-over:		symbol/make "on-over"
 			_actors:		word/load "actors"
 			_scroller:		word/load "scroller"
+			_window:		word/load "window"
+			_panel:			word/load "panel"
 
 			_text:			word/load "text"
 			_data:			word/load "data"
@@ -621,6 +623,7 @@ system/view/platform: context [
 
 	draw-image: routine [image [image!] cmds [block!]][
 		gui/OS-do-draw image cmds
+		ownership/check as red-value! image words/_poke as red-value! image -1 -1
 	]
 
 	draw-face: routine [face [object!] cmds [block!] /local int [red-integer!]][
@@ -677,7 +680,7 @@ system/view/platform: context [
 		SET_RETURN(none-value)
 	]
 
-	init: func [/local svs fonts][
+	init: func [/local svs colors fonts][
 		system/view/screens: svs: make block! 6
 
 		#system [gui/init]
@@ -687,6 +690,7 @@ system/view/platform: context [
 				button:		[1x1   1x1]					;-- LeftxRight TopxBottom
 				tab-panel:	[0x2   0x1]
 				text-list:	[0x0   0x15]
+				group-box:	[0x0   0x1]
 			]
 			MacOSX [
 				button:		[6x6   2x3]
@@ -700,8 +704,8 @@ system/view/platform: context [
 			Windows [
 				check:		[16x0  0x0]					;-- 13 + 3 for text padding
 				radio:		[16x0  0x0]					;-- 13 + 3 for text padding
-				group-box:	[3x3  15x3]
-				tab-panel:	[0x2   0x1]
+				group-box:	[3x3  15x4]
+				tab-panel:	[1x3  25x0]
 			]
 			MacOSX [
 				button:		[7x7   0x0]
@@ -709,6 +713,18 @@ system/view/platform: context [
 				radio:		[20x0  1x1]
 			]
 		]]
+		
+		colors: system/view/metrics/colors
+		#switch config/OS [
+			Windows [
+				colors/tab-panel: white
+				;colors/window							;-- set in gui/init from OS metrics
+				;colors/panel							;-- set in gui/init from OS metrics
+			]
+			MacOSX [
+			
+			]
+		]
 
 		append svs make face! [							;-- default screen
 			type:	'screen

@@ -554,12 +554,16 @@ change-image: func [
 				objc_msgSend [hWnd sel_getUid "setImage:" 0]
 				exit
 			]
-			cg-image: CGBitmapContextCreateImage as-integer image/node
+			either null? image/node [
+				cg-image: image/size
+			][
+				cg-image: CGBitmapContextCreateImage as-integer image/node
+			]
 			id: objc_msgSend [objc_getClass "NSImage" sel_getUid "alloc"]
 			id: objc_msgSend [id sel_getUid "initWithCGImage:size:" cg-image 0 0]
 			objc_msgSend [hWnd sel_getUid "setImage:" id]
 			objc_msgSend [id sel_getUid "release"]
-			CGImageRelease cg-image
+			if image/node <> null [CGImageRelease cg-image]
 		]
 		true [
 			objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]
@@ -968,11 +972,14 @@ same-type?: func [
 
 set-content-view: func [
 	obj		[integer!]
+	red?	[logic!]				;-- red view?
 	/local
 		rect [NSRect!]
 		view [integer!]
+		cls  [c-string!]
 ][
-	view: objc_msgSend [objc_getClass "RedView" sel_getUid "alloc"]
+	cls: either red? ["RedView"]["NSViewFlip"]
+	view: objc_msgSend [objc_getClass cls sel_getUid "alloc"]
 	rect: make-rect 0 0 0 0
 	view: objc_msgSend [view sel_getUid "initWithFrame:" rect/x rect/y rect/w rect/h]
 	objc_msgSend [obj sel_getUid "setContentView:" view]
@@ -1073,7 +1080,7 @@ init-window: func [
 		rect/x rect/y rect/w rect/h flags 2 0
 	]
 
-	set-content-view window
+	set-content-view window yes
 
 	if bits and FACET_FLAGS_NO_BORDER = 0 [
 		sel_Hidden: sel_getUid "setHidden:"
@@ -1623,6 +1630,10 @@ OS-make-view: func [
 		sym = window [
 			rc: make-rect offset/x screen-size-y - offset/y - size/y size/x size/y
 			init-window obj caption bits rc
+			store-face-to-obj
+				objc_msgSend [obj sel_getUid "contentView"]
+				objc_getClass "RedView"
+				face
 			win-cnt: win-cnt + 1
 
 			if all [						;@@ application menu ?
@@ -1652,7 +1663,7 @@ OS-make-view: func [
 			objc_msgSend [obj sel_getUid "setDoubleValue:" flt]
 		]
 		sym = group-box [
-			set-content-view obj
+			set-content-view obj no
 			either zero? caption [
 				objc_msgSend [obj sel_getUid "setTitlePosition:" NSNoTitle]
 			][
@@ -1908,6 +1919,7 @@ OS-do-draw: func [
 		rc	[NSRect!]
 ][
 	rc: make-rect IMAGE_WIDTH(img/size) IMAGE_HEIGHT(img/size) 0 0
+	IMAGE_ENSURE_BUFFER(img)
 	do-draw img/node as red-image! rc cmds yes yes yes yes
 ]
 

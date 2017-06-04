@@ -247,7 +247,7 @@ system: context [
 		]
 		
 		last-error: none
-		trace?: yes
+		trace: 1										;-- 0: disabled
 	]
 	
 	modules: make block! 8
@@ -281,6 +281,7 @@ system: context [
 		home: 			none
 		path: 			what-dir
 		script: 		none
+		cache:			none
 		args: 			none
 		do-arg: 		none
 		debug: 			none

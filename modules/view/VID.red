@@ -13,6 +13,46 @@ Red [
 system/view/VID: context [
 	styles: #include %styles.red
 	
+	GUI-rules: context [
+		active?: yes
+		debug?:  no
+		
+		processors: context [
+			#include %rules.red
+			#switch config/OS [
+				Windows [#include %backends/windows/rules.red]
+				MacOSX	[#include %backends/osx/rules.red]
+			]
+		]
+		
+		general: []
+		OS: [
+			Windows [
+				color-backgrounds
+				color-tabpanel-children
+				OK-Cancel
+			]
+			macOS [
+				capitalize
+				Cancel-OK
+			]
+		]
+		user: []
+		
+		process: function [root [object!]][
+			unless active? [exit]
+			actions: system/view/VID/GUI-rules/processors
+			
+			foreach list reduce [general select OS system/platform user][
+				foreach name list [
+					if debug? [print ["Applying rule:" name]]
+					name: get in processors name
+					do [name root]
+				]
+			]
+		]
+	]
+	
 	focal-face:	none
 	reactors:	make block! 20
 	debug?: 	no
@@ -33,7 +73,7 @@ system/view/VID: context [
 		]
 	]
 	
-	process-reactors: function [][
+	process-reactors: function [][		
 		foreach [f blk later?] reactors [
 			either f [
 				bind blk ctx: context [face: f]
@@ -89,6 +129,14 @@ system/view/VID: context [
 			if find [center middle] align [offset: to integer! round offset / 2.0]
 			face/offset/:axis: face/offset/:axis + offset
 		]
+	]
+	
+	resize-child-panels: function [tab [object!]][		;-- ensures child panels fit accurately in tab-panels
+		tp-size: tab/size
+		if pad: system/view/metrics/paddings/tab-panel [
+			tp-size: tp-size - as-pair pad/1/x + pad/1/y pad/2/x + pad/2/y
+		]
+		foreach pane tab/pane [pane/size: tp-size]
 	]
 	
 	process-draw: function [code [block!]][
@@ -256,9 +304,9 @@ system/view/VID: context [
 									foreach p extract next value 2 [
 										layout/parent/styles reduce ['panel copy p] face divides css
 										p: last face/pane
-										max-sz: max max-sz p/size
+										max-sz: max max-sz p/offset + p/size
 									]
-									unless opts/size [opts/size: max-sz + 0x25] ;@@ extract the right metrics from OS
+									unless opts/size [opts/size: max-sz]
 								]
 							][make-actor opts style/default-actor value spec]
 							yes
@@ -333,13 +381,7 @@ system/view/VID: context [
 			mar: select system/view/metrics/margins face/type
 			face/size: face/size + as-pair mar/1/x + mar/1/y mar/2/x + mar/2/y
 		]
-		all [
-			not any [opts/size find style/template 'size]
-			any [opts/text opts/data]
-			min-size: calc-size face
-			face/size: max face/size min-size
-		]
-		
+		if face/type = 'tab-panel [resize-child-panels face]
 		spec
 	]
 	
@@ -373,7 +415,7 @@ system/view/VID: context [
 		/local axis anti								;-- defined in a SET block
 		/extern focal-face
 	][
-		background!:  make typeset! [image! file! tuple! word! issue!]
+		background!:  make typeset! [image! file! url! tuple! word! issue!]
 		list:		  make block! 4						;-- panel's pane block
 		local-styles: any [css make block! 2]			;-- panel-local styles definitions
 		pane-size:	  0x0								;-- panel's content dynamic size
@@ -506,6 +548,7 @@ system/view/VID: context [
 				]
 				if style/template/type = 'window [throw-error spec]
 				face: make face! copy/deep style/template
+				face/parent: panel
 				spec: fetch-options face opts style spec local-styles to-logic styling?
 				if style/init [do bind style/init 'face]
 				
@@ -557,15 +600,19 @@ system/view/VID: context [
 						mar: select system/view/metrics/margins face/type
 						face/offset: face/offset - as-pair mar/1/x mar/2/x
 					]
+					unless any [face/color panel/type = 'tab-panel][
+						face/color: system/view/metrics/colors/(face/type)
+					]
 					
 					append list face
 					if name [set name face]
-					pane-size: max pane-size face/offset + face/size + spacing
+					pane-size: max pane-size face/offset + face/size
 					if opts/now? [do-actor face none 'time]
 				]
 			]
 			spec: next spec
 		]
+		do re-align
 		process-reactors								;-- Needs to be after [set name face]
 		
 		either block? panel/pane [append panel/pane list][
@@ -577,7 +624,7 @@ system/view/VID: context [
 					pad2: as-pair svmp/1/y svmp/2/y		;-- bottom-right padding
 					origin: either top-left = pad [pad2][max top-left pad2]
 				]
-				panel/size: pane-size - spacing + origin
+				panel/size: pane-size + origin
 			]
 		]
 		if image: panel/image [panel/size: max panel/size image/size]
@@ -587,6 +634,12 @@ system/view/VID: context [
 		if options [set/some panel make object! user-opts]
 		if flags [spec/flags: either spec/flags [unique union spec/flags flgs][flgs]]
 		
-		either only [list][panel]
+		either only [list][
+			if panel/type = 'window [
+				panel/parent: system/view/screens/1
+				system/view/VID/GUI-rules/process panel
+			]
+			panel
+		]
 	]
 ]
