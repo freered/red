@@ -270,6 +270,10 @@ system/view/platform: context [
 			_backdrop:		symbol/make "backdrop"
 			_font-name:		symbol/make "font-name"
 			_font-size:		symbol/make "font-size"
+			_height:		symbol/make "height"
+			_regular:		symbol/make "regular"
+			_small:			symbol/make "small"
+			_mini:			symbol/make "mini"
 			
 			all-over:		symbol/make "all-over"
 			over:			symbol/make "over"
@@ -514,11 +518,17 @@ system/view/platform: context [
 				]
 			]]
 
-			;#include %android/gui.reds
-			#switch OS [
-				Windows  [#include %windows/gui.reds]
-				MacOSX   [#include %osx/gui.reds]
-				#default []					;-- Linux
+			#switch GUI-engine [
+				native [
+					;#include %android/gui.reds
+					#switch OS [
+						Windows  [#include %windows/gui.reds]
+						MacOSX   [#include %osx/gui.reds]
+						#default []					;-- Linux
+					]
+				]
+				test [#include %test/gui.reds]
+				;GTK [#include %GTK/gui.reds]
 			]
 		]
 	]
@@ -706,6 +716,7 @@ system/view/platform: context [
 				radio:		[16x0  0x0]					;-- 13 + 3 for text padding
 				group-box:	[3x3  15x4]
 				tab-panel:	[1x3  25x0]
+				button:		[8x8   0x0]
 			]
 			MacOSX [
 				button:		[7x7   0x0]
@@ -755,4 +766,9 @@ system/view/platform: context [
 	product: none
 	
 	init
+]
+
+#switch config/GUI-engine [
+	native [#if config/OS = 'Android [#include %android/gui.red]]
+	test   [#include %test/gui.red]
 ]

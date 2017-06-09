@@ -69,6 +69,7 @@ system-dialect: make-profilable context [
 		libRed?: 			no
 		libRedRT?: 			no
 		libRedRT-update?:	no
+		GUI-engine:			'native						;-- native | test | GTK | ...
 		modules:			none
 		show:				none
 		command-line:		none
@@ -1630,7 +1631,10 @@ system-dialect: make-profilable context [
 							pos: set id   string!
 							pos: set spec block!    (
 								clear-docstrings spec
-								either all [1 = length? spec not block? spec/1][
+								either any [
+									all [1 = length? spec not block? spec/1]
+									all [2 = length? spec find [pointer! struct!] spec/1 block? spec/2]
+								][
 									unless parse spec type-spec [throw-error err]
 									either ns-path [
 										add-ns-symbol specs/1
@@ -1928,7 +1932,7 @@ system-dialect: make-profilable context [
 			value
 		]
 		
-		comp-use: has [spec use-init use-locals use-stack size][
+		comp-use: has [spec use-init use-locals use-stack size slots][
 			pc: next pc
 			unless all [block? spec: pc/1 not empty? spec][
 				backtrack 'use
@@ -1950,6 +1954,7 @@ system-dialect: make-profilable context [
 			unless find locals /local [append locals /local]
 			append locals spec
 			size: emitter/calc-locals-offsets use-locals
+			emitter/target/emit-reserve-stack slots: size / 4
 			func-locals-sz: func-locals-sz + size
 			
 			pc: next pc
@@ -1957,6 +1962,8 @@ system-dialect: make-profilable context [
 			pc: next pc
 			
 			func-locals-sz: func-locals-sz - size
+			emitter/target/emit-release-stack slots
+			
 			clear use-init
 			clear use-locals
 			clear use-stack

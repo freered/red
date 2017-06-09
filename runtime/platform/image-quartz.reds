@@ -10,10 +10,17 @@ Red/System [
 	}
 ]
 
-#define IMAGE_WIDTH(image)  (OS-image/CGImageGetWidth image) 
-#define IMAGE_HEIGHT(image) (OS-image/CGImageGetHeight image)
+#define IMG_NODE_USE_BUFFER		1
+#define IMG_NODE_MODIFIED		2
 
 OS-image: context [
+
+	img-node!: alias struct! [
+		flags	[integer!]	;-- bit 0: if set, use buffer | bit 1: if set, buffer has been modified
+		handle	[int-ptr!]
+		buffer	[int-ptr!]
+		size	[integer!]
+	]
 
 	NSRect!: alias struct! [
 		x		[float32!]
@@ -21,14 +28,6 @@ OS-image: context [
 		w		[float32!]
 		h		[float32!]
 	]
-
-	#define kCGBitmapByteOrder32Little 		8192
-	#define kCGImageAlphaPremultipliedLast	1
-	#define kCGImageAlphaPremultipliedFirst 2
-	#define kCGImageAlphaLast				3
-	#define kCGImageAlphaFirst				4
-
-	#define kCGImageFormatARGB				8194	;-- kCGImageAlphaPremultipliedFirst or kCGBitmapByteOrder32Little
 
 	#import [
 		"/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices" cdecl [
@@ -47,6 +46,11 @@ OS-image: context [
 			CGImageDestinationFinalize: "CGImageDestinationFinalize" [
 				dst			[integer!]
 				return:		[logic!]
+			]
+			CGImageSourceCreateWithURL: "CGImageSourceCreateWithURL" [
+				url			[integer!]
+				options		[integer!]
+				return:		[integer!]
 			]
 			CGColorSpaceCreateDeviceRGB: "CGColorSpaceCreateDeviceRGB" [
 				return:		[integer!]
@@ -80,10 +84,6 @@ OS-image: context [
 				ctx			[integer!]
 				return:		[byte-ptr!]
 			]
-			CGBitmapContextGetColorSpace: "CGBitmapContextGetColorSpace" [
-				ctx			[integer!]
-				return:		[integer!]
-			]
 			CGContextRelease: "CGContextRelease" [
 				ctx			[integer!]
 			]
@@ -95,13 +95,8 @@ OS-image: context [
 				h			[float32!]
 				src			[integer!]
 			]
-			CGImageSourceCreateWithURL: "CGImageSourceCreateWithURL" [
-				url			[integer!]
-				options		[integer!]
-				return:		[integer!]
-			]
 			CGImageSourceCreateWithData: "CGImageSourceCreateWithData" [
-				data		[integer!]
+				data		[int-ptr!]
 				options		[integer!]
 				return:		[integer!]
 			]
@@ -112,15 +107,43 @@ OS-image: context [
 				return:		[integer!]
 			]
 			CGImageGetWidth: "CGImageGetWidth" [
-				image		[integer!]
+				image		[int-ptr!]
 				return:		[integer!]
 			]
 			CGImageGetHeight: "CGImageGetHeight" [
+				image		[int-ptr!]
+				return:		[integer!]
+			]
+			CGImageGetAlphaInfo: "CGImageGetAlphaInfo" [
 				image		[integer!]
 				return:		[integer!]
 			]
 			CGImageRelease: "CGImageRelease" [
 				image		[integer!]
+			]
+			CGImageCreate: "CGImageCreate" [
+				width		[integer!]
+				height		[integer!]
+				bits-part	[integer!]
+				bits-pixel	[integer!]
+				bytes-row	[integer!]
+				color-space [integer!]
+				bmp-info	[integer!]
+				provider	[integer!]
+				decode		[float32-ptr!]
+				interpolate [logic!]
+				intent		[integer!]
+				return:		[integer!]
+			]
+			CGDataProviderCreateWithData: "CGDataProviderCreateWithData" [
+				info		[int-ptr!]
+				data		[int-ptr!]
+				size		[integer!]
+				releaseData [integer!]
+				return:		[integer!]
+			]
+			CGDataProviderRelease: "CGDataProviderRelease" [
+				provider	[integer!]
 			]
 		]
 		"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" cdecl [
@@ -130,9 +153,17 @@ OS-image: context [
 				length		[integer!]
 				return:		[integer!]
 			]
+			CFDataCreateWithBytesNoCopy: "CFDataCreateWithBytesNoCopy" [
+				allocator	[integer!]
+				bytes		[byte-ptr!]
+				length		[integer!]
+				deallocator [integer!]
+				return:		[integer!]
+			]
 			CFRelease: "CFRelease" [
 				cf			[integer!]
 			]
+			kCFAllocatorNull: "kCFAllocatorNull" [integer!]
 		]
 		"/System/Library/Frameworks/CoreServices.framework/CoreServices" cdecl [
 			kUTTypeJPEG: "kUTTypeJPEG" [integer!]
@@ -161,17 +192,23 @@ OS-image: context [
 	]
 
 	width?: func [
-		handle		[integer!]
+		handle		[node!]
 		return:		[integer!]
+		/local
+			inode	[img-node!]
 	][
-		CGImageGetWidth handle
+		inode: as img-node! (as series! handle/value) + 1
+		IMAGE_WIDTH(inode/size)
 	]
 
 	height?: func [
-		handle		[integer!]
+		handle		[node!]
 		return:		[integer!]
+		/local
+			inode	[img-node!]
 	][
-		CGImageGetHeight handle
+		inode: as img-node! (as series! handle/value) + 1
+		IMAGE_HEIGHT(inode/size)
 	]
 
 	lock-bitmap: func [						;-- do nothing on Quartz backend
@@ -179,34 +216,32 @@ OS-image: context [
 		write?		[logic!]
 		return:		[integer!]
 		/local
-			bmp-ctx [integer!]
+			inode	[img-node!]
 	][
-		either null? img/node [
-			bmp-ctx: OS-image/load-nsdata img/size no yes
-			if write? [img/node: as node! bmp-ctx]
-			bmp-ctx
-		][
-			as-integer img/node
+		inode: as img-node! (as series! img/node/value) + 1
+		if zero? inode/flags [
+			inode/flags: IMG_NODE_USE_BUFFER
+			inode/buffer: OS-image/data-to-image inode/handle yes yes
 		]
+		if write? [inode/flags: inode/flags or IMG_NODE_MODIFIED]
+		as integer! inode
 	]
 
 	unlock-bitmap: func [					;-- do nothing on Quartz backend
 		img			[red-image!]
 		data		[integer!]
-	][
-		if null? img/node [CGContextRelease data]
-	]
+	][]
 
 	get-data: func [
 		handle		[integer!]
 		stride		[int-ptr!]
 		return:		[int-ptr!]
 		/local
-			buf		[int-ptr!]
+			node	[img-node!]
 	][
-		stride/value: 4 * CGBitmapContextGetWidth handle
-		buf: as int-ptr! CGBitmapContextGetData handle
-		buf
+		node: as img-node! handle
+		stride/value: IMAGE_WIDTH(node/size) * 4
+		node/buffer
 	]
 
 	get-pixel: func [
@@ -214,10 +249,11 @@ OS-image: context [
 		index		[integer!]				;-- zero-based
 		return:		[integer!]
 		/local
+			node	[img-node!]
 			buf		[int-ptr!]
 	][
-		buf: as int-ptr! CGBitmapContextGetData bitmap
-		buf: buf + index
+		node: as img-node! bitmap
+		buf: node/buffer + index
 		buf/value
 	]
 
@@ -227,16 +263,19 @@ OS-image: context [
 		color		[integer!]
 		return:		[integer!]
 		/local
+			node	[img-node!]
 			buf		[int-ptr!]
 	][
-		buf: as int-ptr! CGBitmapContextGetData bitmap
-		buf: buf + index
+		node: as img-node! bitmap
+		buf: node/buffer + index
 		buf/value: color
 		color
 	]
 
-	delete: func [img [red-image!]][
-		CGContextRelease as-integer img/node
+	delete: func [img [red-image!] /local inode [img-node!]][
+		inode: as img-node! (as series! img/node/value) + 1
+		if inode/handle <> null [CGImageRelease as-integer inode/handle]
+		if inode/buffer <> null [free as byte-ptr! inode/buffer]
 	]
 
 	resize: func [
@@ -274,11 +313,84 @@ OS-image: context [
 		copy-memory dst-buf src-buf + offset bytes
 	]
 
-	load-nsdata: func [
-		data		[integer!]
-		release?	[logic!]
+	make-node: func [
+		handle	[int-ptr!]
+		buffer	[int-ptr!]
+		flags	[integer!]
+		width	[integer!]
+		height	[integer!]
+		return: [node!]
+		/local
+			node	[node!]
+			inode	[img-node!]
+	][
+		node: alloc-cells 1					;-- 16 bytes
+		inode: as img-node! (as series! node/value) + 1
+		inode/flags: flags
+		inode/handle: handle
+		inode/buffer: buffer
+		inode/size: height << 16 or width
+		node
+	]
+
+	alpha-channel?: func [
+		image	[integer!]
+		return:	[logic!]
+		/local
+			info [integer!]
+	][
+		info: CGImageGetAlphaInfo image
+		all [info > 0 info < 5]
+	]
+
+	unpremultiply-data: func [
+		buf			[int-ptr!]
+		data		[float32-ptr!]			;-- rgba 128bit float32
+		num			[integer!]				;-- number of pixel
+		return:		[int-ptr!]
+		/local
+			p		[int-ptr!]
+			clr		[integer!]
+			r		[float32!]
+			g		[float32!]
+			b		[float32!]
+			a		[float32!]
+			rr		[integer!]
+			gg		[integer!]
+			bb		[integer!]
+			aa		[integer!]
+	][
+		if null? buf [buf: as int-ptr! allocate num * 4]
+		p: buf
+		loop num [
+			r: data/1
+			g: data/2
+			b: data/3
+			a: data/4
+			if all [
+				a <> as float32! 0.0
+				a <> as float32! 1.0
+			][
+				r: r / a
+				g: g / a
+				b: b / a
+			]
+			aa: (as-integer (a * as float32! 255.0)) << 24
+			rr: (as-integer (r * as float32! 255.0)) << 16
+			gg: (as-integer (g * as float32! 255.0)) << 8
+			bb: as-integer (b * as float32! 255.0)
+			p/value: aa or rr or gg or bb
+			p: p + 1
+			data: data + 4
+		]
+		buf
+	]
+
+	data-to-image: func [				;-- convert CGImage or NSData to OS handle or internal buffer
+		data		[int-ptr!]
 		cgimage?	[logic!]
-		return: 	[integer!]
+		edit?		[logic!]
+		return: 	[int-ptr!]
 		/local
 			color-space [integer!]
 			width		[integer!]
@@ -288,50 +400,91 @@ OS-image: context [
 			bytes-row	[integer!]
 			image-data	[integer!]
 			image		[integer!]
+			n			[integer!]
+			info		[integer!]
+			alpha?		[logic!]
+			buf			[byte-ptr!]
+			p			[byte-ptr!]
 	][
 		either cgimage? [
-			image: data
+			image: as-integer data
 		][
 			image-data: CGImageSourceCreateWithData data 0
 			image: CGImageSourceCreateImageAtIndex image-data 0 0
 		]
+
+		unless edit? [return as int-ptr! image]
+
+		alpha?: alpha-channel? image
 		color-space: CGColorSpaceCreateDeviceRGB
-		width: CGImageGetWidth image
-		height: CGImageGetHeight image
+		width: CGImageGetWidth as int-ptr! image
+		height: CGImageGetHeight as int-ptr! image
+
 		bytes-row: width * 4
+		either alpha? [
+			info: 2101h		;-- kCGImageAlphaPremultipliedLast | kCGBitmapFloatComponents
+			n: 4
+		][
+			info: 8198		;-- kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
+			n: 1
+		]
 
 		rect: make-rect 0 0 width height
-		ctx: CGBitmapContextCreate null width height 8 bytes-row color-space kCGImageFormatARGB
+		buf: allocate height * bytes-row * n
+		ctx: CGBitmapContextCreate buf width height 8 * n bytes-row * n color-space info
 		CGContextDrawImage ctx rect/x rect/y rect/w rect/h image
+
+		if alpha? [
+			p: buf
+			buf: as byte-ptr! unpremultiply-data null as float32-ptr! buf width * height
+			free p
+		]
 
 		CGColorSpaceRelease color-space
 		unless cgimage? [
 			CGImageRelease image
-			if release? [CFRelease data]
 			CFRelease image-data
 		]
-		ctx
+		CGContextRelease ctx
+		as int-ptr! buf
 	]
 
 	load-binary: func [
 		data	[byte-ptr!]
 		len		[integer!]
-		return: [integer!]
+		return: [node!]
+		/local
+			h	[int-ptr!]
 	][
-		load-nsdata CFDataCreate 0 data len yes no
+		h: data-to-image as int-ptr! CFDataCreateWithBytesNoCopy 0 data len kCFAllocatorNull no no
+		make-node h null 0 CGImageGetWidth h CGImageGetHeight h
+	]
+
+	load-nsdata: func [
+		data	[int-ptr!]
+		return: [node!]
+		/local
+			h	[int-ptr!]
+	][
+		h: data-to-image data no no
+		make-node h null 0 CGImageGetWidth h CGImageGetHeight h
 	]
 
 	load-image: func [			;-- load image from external resource: file!
 		src			[red-string!]
-		return:		[integer!]
+		return:		[node!]
 		/local
 			img-data [integer!]
 			path	 [integer!]
+			h		 [int-ptr!]
 	][
 		path: simple-io/to-NSURL src yes
 		img-data: CGImageSourceCreateWithURL path 0
 		CFRelease path
-		CGImageSourceCreateImageAtIndex img-data 0 0
+		h: as int-ptr! CGImageSourceCreateImageAtIndex img-data 0 0
+		either null? h [null][
+			make-node h null 0 CGImageGetWidth h CGImageGetHeight h
+		]
 	]
 
 	make-image: func [
@@ -340,7 +493,7 @@ OS-image: context [
 		rgb		[byte-ptr!]
 		alpha	[byte-ptr!]
 		color	[red-tuple!]
-		return: [integer!]
+		return: [node!]
 		/local
 			a			[integer!]
 			r			[integer!]
@@ -349,17 +502,9 @@ OS-image: context [
 			x			[integer!]
 			y			[integer!]
 			scan0		[int-ptr!]
-			ctx			[integer!]
 			pos			[integer!]
-			color-space [integer!]
-			bytes-row	[integer!]
 	][
-		color-space: CGColorSpaceCreateDeviceRGB
-		bytes-row: width * 4
-		ctx: CGBitmapContextCreate null width height 8 bytes-row color-space kCGImageFormatARGB
-		CGColorSpaceRelease color-space
-		scan0: as int-ptr! CGBitmapContextGetData ctx
-
+		scan0: as int-ptr! allocate width * height * 4
 		y: 0
 		either null? color [
 			while [y < height][
@@ -392,7 +537,86 @@ OS-image: context [
 				y: y + 1
 			]
 		]
-		ctx
+		make-node null scan0 IMG_NODE_USE_BUFFER or IMG_NODE_MODIFIED width height
+	]
+
+	make-cgimage: func [
+		image	[red-image!]
+		return: [int-ptr!]
+		/local
+			w	 [integer!]
+			h	 [integer!]
+			data [integer!]
+			clr  [integer!]
+			img  [integer!]
+			node [img-node!]
+	][
+		node: as img-node! (as series! image/node/value) + 1
+		w: IMAGE_WIDTH(image/size)
+		h: IMAGE_HEIGHT(image/size)
+		data: CGDataProviderCreateWithData null node/buffer w * h * 4 0
+		clr: CGColorSpaceCreateDeviceRGB
+		img: CGImageCreate w h 8 32 w * 4 clr 2004h data null true 0 ;-- kCGRenderingIntentDefault
+		CGDataProviderRelease data
+		CGColorSpaceRelease clr
+		as int-ptr! img
+	]
+
+	to-cgimage: func [
+		img		[red-image!]
+		return: [integer!]
+		/local
+			inode	[img-node!]
+			cgimage [int-ptr!]
+	][
+		inode: as img-node! (as series! img/node/value) + 1
+		if inode/flags and IMG_NODE_MODIFIED <> 0 [
+			cgimage: make-cgimage img
+			if inode/handle <> null [CGImageRelease as-integer inode/handle]
+			inode/handle: cgimage
+			inode/flags: IMG_NODE_USE_BUFFER
+		]
+		as-integer inode/handle
+	]
+
+	to-bitmap-ctx: func [
+		img		[integer!]
+		return: [int-ptr!]
+		/local
+			color-space [integer!]
+			width		[integer!]
+			height		[integer!]
+			rect		[NSRect!]
+			ctx			[integer!]
+	][
+		color-space: CGColorSpaceCreateDeviceRGB
+		width: CGImageGetWidth as int-ptr! img
+		height: CGImageGetHeight as int-ptr! img
+
+		rect: make-rect 0 0 width height
+		ctx: CGBitmapContextCreate null width height 32 width * 16 color-space 2101h
+		CGContextDrawImage ctx rect/x rect/y rect/w rect/h img
+		CGColorSpaceRelease color-space
+		as int-ptr! ctx
+	]
+
+	ctx-to-image: func [
+		img		[red-image!]
+		ctx		[integer!]
+		/local
+			data	[float32-ptr!]
+			buf		[int-ptr!]
+			inode	[img-node!]
+	][
+		inode: as img-node! (as series! img/node/value) + 1
+		CGImageRelease as-integer inode/handle
+		inode/handle: as int-ptr! CGBitmapContextCreateImage ctx
+		if inode/flags <> 0 [
+			data: as float32-ptr! CGBitmapContextGetData ctx
+			unpremultiply-data inode/buffer data IMAGE_WIDTH(img/size) * IMAGE_HEIGHT(img/size)
+			inode/flags: IMG_NODE_USE_BUFFER
+		]
+		CGContextRelease ctx
 	]
 
 	encode: func [
@@ -415,7 +639,7 @@ OS-image: context [
 			default    [probe "Cannot find image encoder" return null]
 		]
 
-		img: CGBitmapContextCreateImage as-integer image/node
+		img: to-cgimage image
 		switch TYPE_OF(slot) [
 			TYPE_URL
 			TYPE_FILE [
@@ -428,7 +652,6 @@ OS-image: context [
 				]
 				CFRelease path
 				CFRelease dst
-				CGImageRelease img
 			]
 			default [0]
 		]

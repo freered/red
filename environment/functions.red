@@ -56,7 +56,7 @@ empty?: func [
 
 ??: func [
 	"Prints a word and the value it refers to (molded)"
-	'value [word!]
+	'value [word! path!]
 ][
 	prin mold :value
 	prin ": "
@@ -824,6 +824,68 @@ do-file: func [file [file! url!] /local saved code new-path src][
 	set/any 'code do code
 	if file? file [change-dir saved]
 	:code
+]
+
+;clear-cache: function [/only url][
+;
+;]
+
+path-thru: function [
+	"Returns the local disk cache path of a remote file"
+	url [url!]		"Remote file address"
+	return: [file!]
+][
+	so: system/options
+	unless so/thru-cache [make-dir/deep so/thru-cache: append copy so/cache %cache/]
+	
+	if pos: find/tail file: to-file url "//" [file: pos]
+	path: first split-path file: append copy so/thru-cache file
+	unless exists? path [make-dir/deep path]
+	file
+]
+
+exists-thru?: function [
+	"Return strue if the remote file is present in the local disk cache"
+	url [url! file!] "Remote file address"
+][
+	exists? any [all [file? url url] path-thru url]
+]
+
+read-thru: function [
+	"Reads a remote file through local disk cache"
+	url [url!]	"Remote file address"
+	/update		"Force a cache update"
+	/binary		"Use binary mode"
+][
+	path: path-thru url
+	either all [not update exists? path] [
+		data: either binary [read/binary path][read path]
+	][
+		write/binary path data: either binary [read/binary url][read url]
+	]
+	data
+]
+
+load-thru: function [
+	"Loads a remote file through local disk cache"
+	url [url!]	"Remote file address"
+	/update		"Force a cache update"
+	/as			"Specify the type of data; use NONE to load as code"
+		type [word! none!] "E.g. json, html, jpeg, png, etc"
+][
+	path: path-thru url
+	if all [not update exists? path][url: path]
+	file: either as [load/as url type][load url]
+	if url? url [either as [save/as path file type][save path file]]
+	file
+]
+
+do-thru: function [
+	"Evaluates a remote Red script through local disk cache"
+	url [url!]	"Remote file address"
+	/update		"Force a cache update"
+][
+	do either update [load-thru/update url][load-thru url]
 ]
 
 cos: func [

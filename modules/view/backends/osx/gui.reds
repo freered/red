@@ -541,7 +541,6 @@ change-image: func [
 	image	[red-image!]
 	type	[integer!]
 	/local
-		cg-image [integer!]
 		id		 [integer!]
 ][
 	case [
@@ -554,16 +553,10 @@ change-image: func [
 				objc_msgSend [hWnd sel_getUid "setImage:" 0]
 				exit
 			]
-			either null? image/node [
-				cg-image: image/size
-			][
-				cg-image: CGBitmapContextCreateImage as-integer image/node
-			]
 			id: objc_msgSend [objc_getClass "NSImage" sel_getUid "alloc"]
-			id: objc_msgSend [id sel_getUid "initWithCGImage:size:" cg-image 0 0]
+			id: objc_msgSend [id sel_getUid "initWithCGImage:size:" OS-image/to-cgimage image 0 0]
 			objc_msgSend [hWnd sel_getUid "setImage:" id]
 			objc_msgSend [id sel_getUid "release"]
-			if image/node <> null [CGImageRelease cg-image]
 		]
 		true [
 			objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]
@@ -930,38 +923,6 @@ change-selection: func [
 	]
 ]
 
-setup-tracking-area: func [
-	obj		[integer!]
-	face	[red-object!]
-	rc		[NSRect!]
-	flags	[integer!]
-	/local
-		actors	[red-object!]
-		track	[integer!]
-		options [integer!]
-][
-	actors: as red-object! object/rs-select face as red-value! _actors
-	if TYPE_OF(actors) <> TYPE_OBJECT [exit]
-	if -1 = _context/find-word GET_CTX(actors) on-over yes [exit]
-
-	rc/x: as float32! 0
-	rc/y: as float32! 0
-	options: NSTrackingMouseEnteredAndExited or
-		NSTrackingActiveInKeyWindow or
-		NSTrackingInVisibleRect or
-		NSTrackingEnabledDuringMouseDrag
-	;if flags and FACET_FLAGS_ALL_OVER <> 0 [
-	;	options: options or NSTrackingMouseMoved
-	;]
-	track: objc_msgSend [
-		objc_msgSend [objc_getClass "NSTrackingArea" sel_getUid "alloc"]
-		sel_getUid "initWithRect:options:owner:userInfo:"
-		rc/x rc/y rc/w rc/h options obj 0
-	]
-	objc_msgSend [obj sel_getUid "addTrackingArea:" track]
-	objc_setAssociatedObject obj RedAllOverFlagKey track OBJC_ASSOCIATION_RETAIN
-]
-
 same-type?: func [
 	obj		[integer!]
 	name	[c-string!]
@@ -972,16 +933,19 @@ same-type?: func [
 
 set-content-view: func [
 	obj		[integer!]
-	red?	[logic!]				;-- red view?
+	face	[red-object!]
 	/local
 		rect [NSRect!]
 		view [integer!]
 		cls  [c-string!]
+		id	 [integer!]
 ][
-	cls: either red? ["RedView"]["NSViewFlip"]
-	view: objc_msgSend [objc_getClass cls sel_getUid "alloc"]
+	cls: either null? face ["NSViewFlip"]["RedView"]
+	id: objc_getClass cls
+	view: objc_msgSend [id sel_getUid "alloc"]
 	rect: make-rect 0 0 0 0
 	view: objc_msgSend [view sel_getUid "initWithFrame:" rect/x rect/y rect/w rect/h]
+	if face <> null [store-face-to-obj view id face]
 	objc_msgSend [obj sel_getUid "setContentView:" view]
 ]
 
@@ -1059,6 +1023,7 @@ init-combo-box: func [
 ]
 
 init-window: func [
+	face	[red-object!]
 	window	[integer!]
 	title	[integer!]
 	bits	[integer!]
@@ -1080,7 +1045,7 @@ init-window: func [
 		rect/x rect/y rect/w rect/h flags 2 0
 	]
 
-	set-content-view window yes
+	set-content-view window face
 
 	if bits and FACET_FLAGS_NO_BORDER = 0 [
 		sel_Hidden: sel_getUid "setHidden:"
@@ -1446,6 +1411,70 @@ set-hint-text: func [
 	]
 ]
 
+parse-common-opts: func [
+	hWnd	[integer!]
+	options [red-block!]
+	/local
+		word	[red-word!]
+		w		[red-word!]
+		img		[red-image!]
+		len		[integer!]
+		sym		[integer!]
+		cur		[c-string!]
+		hcur	[integer!]
+		nsimg	[integer!]
+][
+	if TYPE_OF(options) = TYPE_BLOCK [
+		word: as red-word! block/rs-head options
+		len: block/rs-length? options
+		if len % 2 <> 0 [exit]
+		while [len > 0][
+			sym: symbol/resolve word/symbol
+			case [
+				sym = _cursor [
+					w: word + 1
+					either TYPE_OF(w) = TYPE_IMAGE [
+						img: as red-image! w
+						nsimg: objc_msgSend [
+							objc_getClass "NSImage" sel_alloc
+							sel_getUid "initWithCGImage:size:" OS-image/to-cgimage img 0 0
+						]
+						hcur: objc_msgSend [
+							objc_getClass "NSCursor" sel_alloc
+							sel_getUid "initWithImage:hotSpot:" nsimg 0 0
+						]
+						objc_msgSend [nsimg sel_release]
+					][
+						sym: symbol/resolve w/symbol
+						cur: case [
+							sym = _I-beam	["IBeamCursor"]
+							sym = _hand		["pointingHandCursor"]
+							sym = _cross	["crosshairCursor"]
+							true			["arrowCursor"]
+						]
+						hcur: objc_msgSend [objc_getClass "NSCursor" sel_getUid cur]
+					]
+					if hcur <> 0 [objc_setAssociatedObject hWnd RedCursorKey hcur OBJC_ASSOCIATION_ASSIGN]
+				]
+				sym = _height [
+					w: word + 1
+					sym: symbol/resolve w/symbol
+					sym: case [
+						sym = _regular	[0]			;-- 32
+						sym = _small	[1]			;-- 28
+						sym = _mini		[2]			;-- 16
+						true			[0]
+					]
+					objc_msgSend [hWnd sel_getUid "setControlSize:" sym]
+				]
+				true [0]
+			]
+			word: word + 2
+			len: len - 2
+		]
+	]
+]
+
 OS-redraw: func [hWnd [integer!]][objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]]
 
 OS-refresh-window: func [hWnd [integer!]][0]
@@ -1629,11 +1658,7 @@ OS-make-view: func [
 		]
 		sym = window [
 			rc: make-rect offset/x screen-size-y - offset/y - size/y size/x size/y
-			init-window obj caption bits rc
-			store-face-to-obj
-				objc_msgSend [obj sel_getUid "contentView"]
-				objc_getClass "RedView"
-				face
+			init-window face obj caption bits rc
 			win-cnt: win-cnt + 1
 
 			if all [						;@@ application menu ?
@@ -1663,7 +1688,7 @@ OS-make-view: func [
 			objc_msgSend [obj sel_getUid "setDoubleValue:" flt]
 		]
 		sym = group-box [
-			set-content-view obj no
+			set-content-view obj null
 			either zero? caption [
 				objc_msgSend [obj sel_getUid "setTitlePosition:" NSNoTitle]
 			][
@@ -1682,6 +1707,8 @@ OS-make-view: func [
 		]
 		true [0]
 	]
+
+	parse-common-opts obj as red-block! values + FACE_OBJ_OPTIONS
 
 	unless show?/value [change-visible obj no sym]
 
@@ -1917,10 +1944,12 @@ OS-do-draw: func [
 	cmds	[red-block!]
 	/local
 		rc	[NSRect!]
+		ctx [int-ptr!]
 ][
 	rc: make-rect IMAGE_WIDTH(img/size) IMAGE_HEIGHT(img/size) 0 0
-	IMAGE_ENSURE_BUFFER(img)
-	do-draw img/node as red-image! rc cmds yes yes yes yes
+	ctx: OS-image/to-bitmap-ctx OS-image/to-cgimage img
+	do-draw ctx as red-image! rc cmds yes no no no
+	OS-image/ctx-to-image img as-integer ctx
 ]
 
 OS-draw-face: func [

@@ -50,9 +50,6 @@ Red/System [
 #define GpImage!	int-ptr!
 #define GpGraphics! int-ptr!
 
-#define IMAGE_WIDTH(size)  (size and FFFFh) 
-#define IMAGE_HEIGHT(size) (size >> 16)
-
 OS-image: context [
 
 	CLSID_BMP_ENCODER:  [557CF400h 11D31A04h 0000739Ah 2EF31EF8h]
@@ -239,24 +236,24 @@ OS-image: context [
 	]
 
 	width?: func [
-		handle		[integer!]
+		handle		[int-ptr!]
 		return:		[integer!]
 		/local
 			width	[integer!]
 	][
 		width: 0
-		GdipGetImageWidth handle :width
+		GdipGetImageWidth as-integer handle :width
 		width
 	]
 
 	height?: func [
-		handle		[integer!]
+		handle		[int-ptr!]
 		return:		[integer!]
 		/local
 			height	[integer!]
 	][
 		height: 0
-		GdipGetImageHeight handle :height
+		GdipGetImageHeight as-integer handle :height
 		height
 	]
 
@@ -320,7 +317,7 @@ OS-image: context [
 			width	[integer!]
 			arbg	[integer!]
 	][
-		width: width? bitmap
+		width: width? as int-ptr! bitmap
 		arbg: 0
 		GdipBitmapGetPixel bitmap index % width index / width :arbg
 		arbg
@@ -334,7 +331,7 @@ OS-image: context [
 		/local
 			width	[integer!]
 	][
-		width: width? bitmap
+		width: width? as int-ptr! bitmap
 		GdipBitmapSetPixel bitmap index % width index / width color
 	]
 
@@ -415,7 +412,7 @@ OS-image: context [
 
 	load-image: func [
 		src			[red-string!]
-		return:		[integer!]
+		return:		[int-ptr!]
 		/local
 			handle	[integer!]
 			res		[integer!]
@@ -426,19 +423,19 @@ OS-image: context [
 	][
 		handle: 0
 		res: GdipCreateBitmapFromFile file/to-OS-path src :handle
-		unless zero? res [return -1]
+		unless zero? res [return null]
 
 		format: 0
 		bitmap: 0
 		GdipGetImagePixelFormat handle :format
-		w: width? handle
-		h: height? handle
+		w: width? as int-ptr! handle
+		h: height? as int-ptr! handle
 		GdipCreateBitmapFromScan0 w h 0 format null :bitmap
 
 		copy bitmap handle 0 h 0 format
 
 		GdipDisposeImage handle 
-		bitmap
+		as int-ptr! bitmap
 	]
 
 	make-image: func [
@@ -447,7 +444,7 @@ OS-image: context [
 		rgb		[byte-ptr!]
 		alpha	[byte-ptr!]
 		color	[red-tuple!]
-		return: [integer!]
+		return: [int-ptr!]
 		/local
 			a		[integer!]
 			r		[integer!]
@@ -490,13 +487,13 @@ OS-image: context [
 		]
 
 		unlock-bitmap-fmt bitmap as-integer data
-		bitmap
+		as int-ptr! bitmap
 	]
 
 	load-binary: func [
 		data	[byte-ptr!]
 		len		[integer!]
-		return: [integer!]
+		return: [node!]
 		/local
 			hMem [integer!]
 			p	 [byte-ptr!]
@@ -512,7 +509,7 @@ OS-image: context [
 		bmp: 0
 		CreateStreamOnHGlobal hMem true :s
 		GdipCreateBitmapFromStream s :bmp
-		bmp
+		as node! bmp
 	]
 
 	encode: func [

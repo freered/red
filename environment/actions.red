@@ -130,7 +130,7 @@ negate: make action! [[
 power: make action! [[
 		"Returns a number raised to a given power (exponent)"
 		number	 [number!] "Base value"
-		exponent [number!] "The power (index) to raise the base value by"
+		exponent [integer! float!] "The power (index) to raise the base value by"
 		return:	 [number!]
 	]
 	#get-definition ACT_POWER
@@ -528,12 +528,18 @@ trim: make action! [[
 
 ;create
 ;close
-;delete
+
+delete: make action! [[
+		"Deletes the specified file or empty folder"
+		file [file!]
+	]
+	#get-definition ACT_DELETE
+]
 ;open
 ;open?
 ;query
 read: make action! [[
-		"Read from a file, URL, or other port"
+		"Reads from a file, URL, or other port"
 		source	[file! url!]
 		/part	"Partial read a given number of units (source relative)"
 			length [number!]
