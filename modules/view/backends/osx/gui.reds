@@ -257,11 +257,20 @@ get-os-version: func [
 	int/value:  0
 ]
 
-set-defaults: func [][
+set-defaults: func [/local n [float32!]][
 	default-font: objc_msgSend [
 		objc_getClass "NSFont" sel_getUid "systemFontOfSize:" 0
 	]
 	objc_msgSend [default-font sel_getUid "retain"]
+
+	to-red-string
+		objc_msgSend [default-font sel_getUid "familyName"]
+		#get system/view/fonts/system
+
+	n: objc_msgSend_f32 [default-font sel_getUid "pointSize"]
+	integer/make-at 
+		#get system/view/fonts/size
+		as-integer n
 ]
 
 get-metrics: func [][
@@ -1142,7 +1151,7 @@ init-base-face: func [
 	]
 
 	if TYPE_OF(menu) = TYPE_BLOCK [set-context-menu obj menu]
-	if transparent-base? color [objc_msgSend [obj sel_getUid "setWantsLayer:" yes]]
+	;if transparent-base? color [objc_msgSend [obj sel_getUid "setWantsLayer:" yes]]
 ]
 
 make-area: func [
@@ -1418,6 +1427,7 @@ parse-common-opts: func [
 		word	[red-word!]
 		w		[red-word!]
 		img		[red-image!]
+		bool	[red-logic!]
 		len		[integer!]
 		sym		[integer!]
 		cur		[c-string!]
@@ -1466,6 +1476,10 @@ parse-common-opts: func [
 						true			[0]
 					]
 					objc_msgSend [hWnd sel_getUid "setControlSize:" sym]
+				]
+				sym = _accelerated [
+					bool: as red-logic! word + 1
+					if bool/value [objc_msgSend [hWnd sel_getUid "setWantsLayer:" yes]]
 				]
 				true [0]
 			]
@@ -1922,21 +1936,27 @@ OS-to-image: func [
 	face	[red-object!]
 	return: [red-image!]
 	/local
-		hWnd 	[handle!]
-		dc		[handle!]
-		mdc		[handle!]
-		rect	[RECT_STRUCT]
-		width	[integer!]
-		height	[integer!]
-		bmp		[handle!]
-		bitmap	[integer!]
-		img		[red-image!]
-		word	[red-word!]
-		type	[integer!]
-		size	[red-pair!]
-		screen? [logic!]
+		view [integer!]
+		data [integer!]
+		rc	 [NSRect! value]
+		bmp  [integer!]
+		img  [integer!]
+		ret  [red-image!]
 ][
-	as red-image! none-value
+	view: as-integer face-handle? face
+	either zero? view [as red-image! none-value][
+		rc: objc_msgSend_rect [view sel_getUid "bounds"]
+		data: objc_msgSend [view sel_getUid "dataWithPDFInsideRect:" rc/x rc/y rc/w rc/h]
+		img: objc_msgSend [
+			objc_msgSend [objc_getClass "NSImage" sel_alloc]
+			sel_getUid "initWithData:" data
+		]
+		bmp: objc_msgSend [img sel_getUid "CGImageForProposedRect:context:hints:" 0 0 0]
+		ret: image/init-image as red-image! stack/push* OS-image/load-cgimage as int-ptr! bmp
+		objc_msgSend [bmp sel_getUid "retain"]
+		objc_msgSend [img sel_release]
+		ret
+	]
 ]
 
 OS-do-draw: func [
