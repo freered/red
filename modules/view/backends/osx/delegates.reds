@@ -65,8 +65,10 @@ mouse-entered: func [
 	cmd		[integer!]
 	event	[integer!]
 ][
-	objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
-	make-event self 0 EVT_OVER
+	if zero? objc_getAssociatedObject self RedEnableKey [
+		objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
+		make-event self 0 EVT_OVER
+	]
 ]
 
 mouse-exited: func [
@@ -75,8 +77,10 @@ mouse-exited: func [
 	cmd		[integer!]
 	event	[integer!]
 ][
-	objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
-	make-event self EVT_FLAG_AWAY EVT_OVER
+	if zero? objc_getAssociatedObject self RedEnableKey [
+		objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
+		make-event self EVT_FLAG_AWAY EVT_OVER
+	]
 ]
 
 mouse-moved: func [
@@ -87,10 +91,12 @@ mouse-moved: func [
 	/local
 		flags [integer!]
 ][
-	objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
-	flags: get-flags (as red-block! get-face-values self) + FACE_OBJ_FLAGS
-	if flags and FACET_FLAGS_ALL_OVER <> 0 [
-		make-event self 0 EVT_OVER
+	if zero? objc_getAssociatedObject self RedEnableKey [
+		objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
+		flags: get-flags (as red-block! get-face-values self) + FACE_OBJ_FLAGS
+		if flags and FACET_FLAGS_ALL_OVER <> 0 [
+			make-event self 0 EVT_OVER
+		]
 	]
 ]
 
@@ -195,9 +201,12 @@ mouse-events: func [
 		NSRightMouseDragged	
 		NSOtherMouseDragged	[
 			opt: (get-face-values self) + FACE_OBJ_OPTIONS
-			either any [
-				TYPE_OF(opt) = TYPE_BLOCK
-				0 <> objc_getAssociatedObject self RedAllOverFlagKey
+			either all [
+				zero? objc_getAssociatedObject self RedEnableKey
+				any [
+					TYPE_OF(opt) = TYPE_BLOCK
+					0 <> objc_getAssociatedObject self RedAllOverFlagKey
+				]
 			][
 				make-event self flags EVT_OVER
 			][
@@ -849,13 +858,13 @@ render-text: func [
 	flags: either TYPE_OF(para) = TYPE_OBJECT [		;@@ TBD set alignment attribute
 		get-para-flags base para
 	][
-		1 or 4										;-- center
+		2 or 4										;-- center
 	]
 
 	m: make-CGMatrix 1 0 0 -1 0 0
 	case [
-		flags and 1 <> 0 [temp: sz/w - rc/x m/tx: temp / 2]
-		flags and 2 <> 0 [m/tx: sz/w - rc/x]
+		flags and 1 <> 0 [m/tx: sz/w - rc/x]
+		flags and 2 <> 0 [temp: sz/w - rc/x m/tx: temp / 2]
 		true [0]
 	]
 
@@ -872,10 +881,18 @@ render-text: func [
 	line: CTLineCreateWithAttributedString attr
 	CGContextSetTextMatrix ctx m/a m/b m/c m/d m/tx m/ty
 	CTLineDraw line ctx
-
 	CFRelease str
 	CFRelease attr
 	CFRelease line
+
+	attr: objc_msgSend [attrs sel_getUid "objectForKey:" NSStrikethroughStyleAttributeName]
+	if as logic! objc_msgSend [attr sel_getUid "boolValue"][
+		m/ty: m/ty - temp + (rc/y / as float32! 2.0)
+		CGContextTranslateCTM ctx m/tx m/ty
+		CGContextMoveToPoint ctx as float32! 0.0 as float32! 0.0
+		CGContextAddLineToPoint ctx rc/x as float32! 0.0
+		CGContextStrokePath ctx
+	]
 	objc_msgSend [attrs sel_getUid "release"]
 	CGContextRestoreGState ctx
 ]
