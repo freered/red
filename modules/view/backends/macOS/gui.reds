@@ -40,6 +40,7 @@ log-pixels-y:	0
 screen-size-x:	0
 screen-size-y:	0
 mac-version:	0
+nsview-id:		0
 
 ;-- for IME support
 in-composition?: no
@@ -304,6 +305,8 @@ init: func [
 
 	get-os-version
 	register-classes
+
+	nsview-id: objc_getClass "NSView"
 
 	delegate: objc_msgSend [objc_getClass "RedAppDelegate" sel_getUid "alloc"]
 	delegate: objc_msgSend [delegate sel_getUid "init"]
@@ -1474,7 +1477,10 @@ parse-common-opts: func [
 						sym = _mini		[2]			;-- 16
 						true			[0]
 					]
-					objc_msgSend [hWnd sel_getUid "setControlSize:" sym]
+					objc_msgSend [
+						objc_msgSend [hWnd sel_getUid "cell"]
+						sel_getUid "setControlSize:" sym
+					]
 					btn?: no
 				]
 				sym = _accelerated [

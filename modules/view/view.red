@@ -666,6 +666,7 @@ show: function [
 	face [object! block!] "Face object to display"
 	/with				  "Link the face to a parent face"
 		parent [object!]  "Parent face to link to"
+	/force				  "For internal use only!"
 ][
 	if block? face [
 		foreach f face [
@@ -690,8 +691,9 @@ show: function [
 		new?: yes
 		
 		if face/type <> 'screen [
-			if all [not parent not object? face/parent face/type <> 'window][
-				cause-error 'script 'not-linked []
+			if all [not force face/type <> 'window][
+				if all [object? face/parent face/parent/type <> 'tab-panel][face/parent: none]
+				unless parent [cause-error 'script 'not-linked []]
 			]
 			if any [series? face/extra object? face/extra][
 				modify face/extra 'owned none			;@@ TBD: unflag object's fields (ownership)
@@ -704,7 +706,7 @@ show: function [
 			#if config/OS = 'macOS [					;@@ remove this system specific code
 				if all [face/type = 'tab-panel face/pane][
 					link-tabs-to-parent face
-					foreach f face/pane [show f]
+					foreach f face/pane [show/force f]
 				]
 			]
 
