@@ -1468,7 +1468,7 @@ parse-common-opts: func [
 					]
 					if hcur <> 0 [objc_setAssociatedObject hWnd RedCursorKey hcur OBJC_ASSOCIATION_ASSIGN]
 				]
-				sym = _height [
+				sym = _class [
 					w: word + 1
 					sym: symbol/resolve w/symbol
 					sym: case [
@@ -1593,7 +1593,7 @@ OS-make-view: func [
 			sym = drop-list
 		][
 			class: "RedComboBox"
-			size/y: 26									;@@ set to default height
+			if size/y > 26 [size/y: 26]
 		]
 		sym = slider [class: "RedSlider"]
 		sym = progress [class: "RedProgress"]

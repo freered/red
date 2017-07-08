@@ -396,8 +396,8 @@ intersect: make native! [[
 
 difference: make native! [[
 		"Returns the special difference of two data sets"
-		set1 [block! hash! string! bitset! typeset!]
-		set2 [block! hash! string! bitset! typeset!]
+		set1 [block! hash! string! bitset! typeset! date!]
+		set2 [block! hash! string! bitset! typeset! date!]
 		/case "Use case-sensitive comparison"
 		/skip "Treat the series as fixed size records"
 			size [integer!]
@@ -825,7 +825,7 @@ now: make native! [[
 		/yearday	"Returns day of the year (Julian)"
 		/precise	"High precision time"
 		/utc		"Universal time (no zone)"
-		return: [time!]					;@@ add date! when we have it
+		return: [date! time! integer!]
 	]
 	#get-definition NAT_NOW
 ]
