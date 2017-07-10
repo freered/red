@@ -35,6 +35,32 @@ Red [
 	--test-- "cfmt-17" --assert "2-Oct-1999/2:00:00-04:00"	= mold 1999-10-2/2:00-4:00
 	--test-- "cfmt-18" --assert "1-Jan-1990/12:20:25-06:00"	= mold 1/1/1990/12:20:25-6
 	
+	--test-- "cfmt-19" --assert "7-Jul-2017/8:22:23"		= mold 2017-07-07T08:22:23+00:00
+	--test-- "cfmt-20" --assert "7-Jul-2017/8:22:23"		= mold 2017-07-07T08:22:23Z
+	--test-- "cfmt-21" --assert "7-Jul-2017/8:22:23"		= mold 20170707T082223Z
+	--test-- "cfmt-22" --assert "7-Jul-2017/8:22:00"		= mold 20170707T0822Z
+	--test-- "cfmt-23" --assert "7-Jul-2017/8:22:23+05:30"	= mold 20170707T082223+0530
+	
+	
+	--test-- "cfmt-24" --assert "2-Jan-2017" 				= mold 2017-W01
+	--test-- "cfmt-25" --assert "9-Jun-2017" 				= mold 2017-W23-5
+	--test-- "cfmt-26" --assert "1-Jan-2017" 				= mold 2017-001
+	--test-- "cfmt-27" --assert "2-Jun-2017" 				= mold 2017-153
+	--test-- "cfmt-28" --assert "2-Jan-2017/10:50:00"		= mold 2017-W01T10:50
+	--test-- "cfmt-29" --assert "9-Jun-2017/10:50:00-04:00"	= mold 2017-W23-5T10:50:00-4:00
+	--test-- "cfmt-30" --assert "1-Jan-2017/10:50:00" 		= mold 2017-001T10:50
+	--test-- "cfmt-31" --assert "2-Jun-2017/10:50:00-04:00" = mold 2017-153T10:50:00-4:00
+	
+	
+	--test-- "cfmt-40" --assert "3-Mar-0000/13:44:24+09:15"		= mold 3-Mar-0000/13:44:24+09:15
+	--test-- "cfmt-41" --assert "3-Mar-2017/13:44:24-02:15"		= mold 3-Mar-2017/13:44:24-02:15
+	--test-- "cfmt-42" --assert "3-Mar-2017/13:44:24-02:00"		= mold 3-Mar-2017/13:44:24-02:00
+	--test-- "cfmt-43" --assert "[3-Mar-0000/13:44:24+09:15]"	= mold [3-Mar-0000/13:44:24+09:15]
+	--test-- "cfmt-44" --assert "[3-Mar-2017/13:44:24+09:00]"	= mold [3-Mar-2017/13:44:24+09:00]
+	--test-- "cfmt-45" --assert "[3-Mar-2017/13:44:24-02:00]"	= mold [3-Mar-2017/13:44:24-02:00]
+	--test-- "cfmt-46" --assert "[3-Mar-2017/13:44:24-02:15]"	= mold [3-Mar-2017/13:44:24-02:15]
+	--test-- "cfmt-47" --assert "[3-Mar-2017/13:44:24]"			= mold [3-Mar-2017/13:44:24]
+
 ===end-group===
 
 ===start-group=== "input formats (run-time lexer)"
@@ -59,6 +85,21 @@ Red [
 	--test-- "rfmt-16" --assert 4-Apr-2000/6:00:00+08:00  = load "4/Apr/2000/6:00+8:00"
 	--test-- "rfmt-17" --assert 2-Oct-1999/2:00:00-4:00   = load "1999-10-2/2:00-4:00"
 	--test-- "rfmt-18" --assert 1-Jan-1990/12:20:25-06:00 = load "1/1/1990/12:20:25-6"
+
+	--test-- "rfmt-19" --assert 7-Jul-2017/8:22:23		  = load "2017-07-07T08:22:23+00:00"
+	--test-- "rfmt-20" --assert 7-Jul-2017/8:22:23		  = load "2017-07-07T08:22:23Z"
+	--test-- "rfmt-21" --assert 7-Jul-2017/8:22:23		  = load "20170707T082223Z"
+	--test-- "rfmt-22" --assert 7-Jul-2017/8:22:00		  = load "20170707T0822Z"
+	--test-- "rfmt-23" --assert 7-Jul-2017/8:22:23+05:30  = load "20170707T082223+0530"
+	
+	--test-- "rfmt-24" --assert 2-Jan-2017 				  = load "2017-W01"
+	--test-- "rfmt-25" --assert 9-Jun-2017 				  = load "2017-W23-5"
+	--test-- "rfmt-26" --assert 1-Jan-2017 				  = load "2017-001"
+	--test-- "rfmt-27" --assert 2-Jun-2017 				  = load "2017-153"
+	--test-- "rfmt-28" --assert 2-Jan-2017/10:50:00		  = load "2017-W01T10:50"
+	--test-- "rfmt-29" --assert 9-Jun-2017/10:50:00-04:00 = load "2017-W23-5T10:50:00-4:00"
+	--test-- "rfmt-30" --assert 1-Jan-2017/10:50:00		  = load "2017-001T10:50"
+	--test-- "rfmt-31" --assert 2-Jun-2017/10:50:00-04:00 = load "2017-153T10:50:00-4:00"
 
 ===end-group===
 
@@ -113,7 +154,7 @@ Red [
 
 ===end-group===
 
-===start-group=== "MAKE date!"
+===start-group=== "dates creation"
 
 	--test-- "make1"	--assert 3-Feb-1978				  = make date! [1978 2 3]
 	--test-- "make2"	--assert 3-Feb-1978/5:00:00+08:00 = make date! [1978 2 3 5:0:0 8]
@@ -123,17 +164,19 @@ Red [
 	--test-- "make6"	--assert 3-Feb-1978/5:20:30+4:00  = make date! [1978 2 3 5 20 30 4]
 	--test-- "make7"	--assert error? try [make date! [1978 2 3 5]]
 	--test-- "make8"	--assert error? try [make date! [1978 2 3 5 20]]
-	--test-- "make9"	--assert 3-Mar-1973/9:46:40 = make date! reduce [1970 1 1 to-time 100000000 0]
-	--test-- "make10"	--assert 1-Mar-1981 = make date! reduce [1981 2 29]
+	--test-- "make10"	--assert error? try [make date! [1981 2 29]]
+	--test-- "make11"	--assert error? try [make date! [1 2 2017 23 70 0 4:30]]
+	--test-- "make12"	--assert error? try [make date! [1 2 2017 23:70:0 4:30]]
+	--test-- "make13"	--assert error? try [make date! [1 2 2017 23:20:70 4:30]]
 	
-	--test-- "make11"	--assert 3-Feb-1978				  = make date! [3 2 1978]
-	--test-- "make12"	--assert 3-Feb-1978/5:20:30+4:00  = make date! [3 2 1978 5 20 30 4]
-	--test-- "make11"	--assert 1-Jan-0001 			  = make date! [1 1 1]
-	--test-- "make11"	--assert 1-Jan-0002 			  = make date! [1 1 2]
-	;--test-- "make11"	--assert 30-Jan-0002			  = make date! [30 1 2]
-	;--test-- "make11"	--assert 1-Feb-0002				  = make date! [32 1 2]
-	;--test-- "make11"	--assert 9-Apr-0002				  = make date! [99 1 2]
-	--test-- "make11"	--assert 2-Jan-0100				  = make date! [100 1 2]
+	--test-- "make14"	--assert 3-Feb-1978				  = make date! [3 2 1978]
+	--test-- "make15"	--assert 3-Feb-1978/5:20:30+4:00  = make date! [3 2 1978 5 20 30 4]
+	--test-- "make16"	--assert 1-Jan-0001 			  = make date! [1 1 1]
+	--test-- "make17"	--assert 1-Jan-0002 			  = make date! [1 1 2]
+	--test-- "make18"	--assert 30-Jan-0002			  = make date! [30 1 2]
+	--test-- "make19"	--assert error? try [make date! [32 1 2]]
+	--test-- "make20"	--assert error? try [make date! [99 1 2]]
+	--test-- "make21"	--assert 2-Jan-0100				  = make date! [100 1 2]
 	
 ===end-group===
 
@@ -151,16 +194,18 @@ Red [
 	--test-- "pathr-9"  --assert d/weekday = 3
 	--test-- "pathr-10" --assert d/yearday = 186
 	--test-- "pathr-11" --assert d/yearday = d/julian
+	--test-- "pathr-12" --assert d/week	   = 27
+	--test-- "pathr-13" --assert d/isoweek = 27
 	
 	--test-- "pw-year"
 		d: 5-Jul-2017/12:41:40+08:00
 		d/year:	1981
 		--assert d/year = 1981
 		
-		;d: 5-Jul-2017/12:41:40+08:00
-		;d/year: 0
-		;--assert d/year = 0
-		;--assert d = 5-Jul-0000/12:52:06+08:00
+		d: 5-Jul-2017/12:41:40+08:00
+		d/year: 0
+		--assert d/year = 0
+		--assert d = 5-Jul-0000/12:41:40+08:00
 		
 		d: 5-Jul-2017/12:41:40+08:00
 		d/year: -150
@@ -182,7 +227,7 @@ Red [
 		d: 5-Jul-2017/12:41:40+08:00
 		d/month: -2
 		--assert d/month = 10
-		--assert d = 5-Oct-2017/12:41:40+08:00
+		--assert d = 5-Oct-2016/12:41:40+08:00
 		
 	--test-- "pw-month3"
 		d: 5-Jul-2017/12:41:40+08:00
@@ -545,6 +590,32 @@ Red [
 		--assert d/yearday = 266
 		--assert d = 22-Sep-2016/12:41:40+08:00
 		
+		
+	--test-- "pw-week1"
+		d: 5-Jul-2017/12:41:40+8:00
+		d/week: 100
+		--assert d/week = 48
+		--assert d = 25-Nov-2018/12:41:40+08:00
+
+	--test-- "pw-week2"
+		d: 5-Jul-2017/12:41:40+8:00
+		d/week: 500
+		--assert d/week = 31
+		--assert d = 26-Jul-2026/12:41:40+08:00
+
+	--test-- "pw-week3"
+		d: 5-Jul-2017/12:41:40+8:00
+		d/week: 0
+		--assert d/week = 1
+		--assert d = 1-Jan-2017/12:41:40+08:00
+
+	--test-- "pw-week4"
+		d: 5-Jul-2017/12:41:40+8:00
+		d/week: -100
+		--assert d/week = 1
+	--assert d = 1-Jan-2017/12:41:40+08:00
+	
+	
 	--test-- "julianday" --assert d/yearday = d/julian
 
 ===end-group===
@@ -593,7 +664,81 @@ Red [
 	--test-- "conv-11"	--assert 1/1/1969 = to-date -31536000
 	--test-- "conv-12"	--assert 1/1/2000 = to-date 946684800
 	--test-- "conv-13"	--assert 31-Dec-1999/23:00:34 = to-date 946681234
+	--test-- "conv-14"	--assert 31-Dec-1969/23:59:59 = to-date -1
+	
+	--test-- "conv-20"	--assert 3-Mar-1973/9:46:40 = to-date reduce [1970 1 1 to-time 100000000 0]
+	--test-- "conv-21"	--assert 1-Mar-1981 = to-date [1981 2 29]
+	--test-- "conv-22"	--assert 2-Feb-2017/0:10:00+04:30 = to date! [1 2 2017 23 70 0 4:30]
 
+===end-group===
+
+===start-group=== "weeks accuracy"
+
+	--test-- "wr-1"		d: 13-Jan-2019 	--assert d/week = 3
+	--test-- "wr-2"		d: 12-Jan-2019 	--assert d/week = 2
+	--test-- "wr-3"		d: 6-Jan-2019 	--assert d/week = 2
+	--test-- "wr-4"		d: 5-Jan-2019 	--assert d/week = 1
+	--test-- "wr-5"		d: 14-Jan-2018 	--assert d/week = 3
+	--test-- "wr-6"		d: 13-Jan-2018 	--assert d/week = 2
+	--test-- "wr-7"		d: 7-Jan-2018 	--assert d/week = 2
+	--test-- "wr-8"		d: 6-Jan-2018 	--assert d/week = 1
+	--test-- "wr-9"		d: 15-Jan-2017 	--assert d/week = 3
+	--test-- "wr-10"	d: 14-Jan-2017 	--assert d/week = 2
+	--test-- "wr-11"	d: 8-Jan-2017 	--assert d/week = 2
+	--test-- "wr-12"	d: 7-Jan-2017 	--assert d/week = 1
+	--test-- "wr-13"	d: 10-Jan-2016 	--assert d/week = 3
+	--test-- "wr-14"	d: 9-Jan-2016 	--assert d/week = 2
+	--test-- "wr-15"	d: 3-Jan-2016	--assert d/week = 2
+	--test-- "wr-16"	d: 2-Jan-2016	--assert d/week = 1
+	--test-- "wr-17"	d: 11-Jan-2015 	--assert d/week = 3
+	--test-- "wr-18"	d: 10-Jan-2015 	--assert d/week = 2
+	--test-- "wr-19"	d: 4-Jan-2015	--assert d/week = 2
+	--test-- "wr-20"	d: 3-Jan-2015	--assert d/week = 1
+	--test-- "wr-21"	d: 12-Jan-2014 	--assert d/week = 3
+	--test-- "wr-22"	d: 11-Jan-2014 	--assert d/week = 2
+	--test-- "wr-23"	d: 5-Jan-2014	--assert d/week = 2
+	--test-- "wr-24"	d: 4-Jan-2014	--assert d/week = 1
+	--test-- "wr-25"	d: 13-Jan-2013 	--assert d/week = 3
+	--test-- "wr-26"	d: 12-Jan-2013 	--assert d/week = 2
+	--test-- "wr-27"	d: 6-Jan-2013	--assert d/week = 2
+	--test-- "wr-28"	d: 5-Jan-2013	--assert d/week = 1
+	--test-- "wr-29"	d: 15-Jan-2012 	--assert d/week = 3
+	--test-- "wr-30"	d: 14-Jan-2012 	--assert d/week = 2
+	--test-- "wr-31"	d: 8-Jan-2012	--assert d/week = 2
+	--test-- "wr-32"	d: 7-Jan-2012	--assert d/week = 1
+	--test-- "wr-33"	d: 9-Jan-2011 	--assert d/week = 3
+	--test-- "wr-34"	d: 8-Jan-2011 	--assert d/week = 2
+	--test-- "wr-35"	d: 2-Jan-2011	--assert d/week = 2
+	--test-- "wr-36"	d: 1-Jan-2011	--assert d/week = 1
+
+	--test-- "ww-1"		d: 3-Jul-2019	d/week: 3	--assert d = 13-Jan-2019
+	--test-- "ww-3"		d: 3-Jul-2019	d/week: 2	--assert d = 6-Jan-2019
+	--test-- "ww-4"		d: 3-Jul-2019	d/week: 1	--assert d = 1-Jan-2019
+	--test-- "ww-5"		d: 3-Jul-2018	d/week: 3	--assert d = 14-Jan-2018
+	--test-- "ww-7"		d: 3-Jul-2018	d/week: 2	--assert d = 7-Jan-2018
+	--test-- "ww-8"		d: 3-Jul-2018	d/week: 1	--assert d = 1-Jan-2018
+	--test-- "ww-9"		d: 3-Jul-2017	d/week: 3	--assert d = 15-Jan-2017
+	--test-- "ww-11"	d: 3-Jul-2017	d/week: 2	--assert d = 8-Jan-2017
+	--test-- "ww-12"	d: 3-Jul-2017	d/week: 1	--assert d = 1-Jan-2017
+	--test-- "ww-13"	d: 3-Jul-2016	d/week: 3	--assert d = 10-Jan-2016
+	--test-- "ww-15"	d: 3-Jul-2016	d/week: 2	--assert d = 3-Jan-2016
+	--test-- "ww-16"	d: 3-Jul-2016	d/week: 1	--assert d = 1-Jan-2016
+	--test-- "ww-17"	d: 3-Jul-2015	d/week: 3	--assert d = 11-Jan-2015
+	--test-- "ww-19"	d: 3-Jul-2015	d/week: 2	--assert d = 4-Jan-2015
+	--test-- "ww-20"	d: 3-Jul-2015	d/week: 1	--assert d = 1-Jan-2015
+	--test-- "ww-21"	d: 3-Jul-2014	d/week: 3	--assert d = 12-Jan-2014
+	--test-- "ww-23"	d: 3-Jul-2014	d/week: 2	--assert d = 5-Jan-2014
+	--test-- "ww-24"	d: 3-Jul-2014	d/week: 1	--assert d = 1-Jan-2014
+	--test-- "ww-25"	d: 3-Jul-2013	d/week: 3	--assert d = 13-Jan-2013
+	--test-- "ww-27"	d: 3-Jul-2013	d/week: 2	--assert d = 6-Jan-2013
+	--test-- "ww-28"	d: 3-Jul-2013	d/week: 1	--assert d = 1-Jan-2013
+	--test-- "ww-29"	d: 3-Jul-2012	d/week: 3	--assert d = 15-Jan-2012
+	--test-- "ww-31"	d: 3-Jul-2012	d/week: 2	--assert d = 8-Jan-2012
+	--test-- "ww-32"	d: 3-Jul-2012	d/week: 1	--assert d = 1-Jan-2012
+	--test-- "ww-33"	d: 3-Jul-2011	d/week: 3	--assert d = 9-Jan-2011
+	--test-- "ww-35"	d: 3-Jul-2011	d/week: 2	--assert d = 2-Jan-2011
+	--test-- "ww-36"	d: 3-Jul-2011	d/week: 1	--assert d = 1-Jan-2011
+	
 ===end-group===
 
 ===start-group=== "ISO weeks accuracy"
@@ -673,12 +818,43 @@ Red [
 		--assert "1-Jan-0001" = mold load "1/1/0001"
 
 	--test-- "misc-2"
-		;d: 1/1/0000	;@@ not supported by compiler yet
-		d: 1/1/0001
-		d: d - 366
+		d: 1/1/0000
+		d: d - 1
 		--assert "31/Dec/-1" = mold d
 
-	;random action tests
+	--test-- "misc-3"
+		res: make block! 10
+		random/seed 1
+		loop 10 [append res random 1/1/9999]
+		--assert res = [
+			4-May-1485 
+			28-Jul-6609 
+			14-Jan-9528 
+			20-May-6200 
+			14-Dec-8121 
+			17-Apr-0909 
+			18-Jan-0386 
+			13-Mar-9178 
+			26-Sep-3370 
+			23-Mar-2377
+		]
+		
+	--test-- "misc-4"
+		res: make block! 10
+		random/seed 2
+		loop 10 [append res random 1/1/9999/23:59:59]
+		--assert res = [
+			3-Mar-0000/13:44:24+09:45
+			14-Jan-2046/9:34:48-12:15
+			19-Nov-4262/9:41:12-01:30
+			12-Feb-1864/3:26:00-14:30
+			29-Jul-4351/8:14:00+09:30
+			18-Dec-1884/22:30:48-07:00
+			21-May-5509/0:14:24-03:00
+			23-Apr-4622/4:22:48+05:30
+			22-Feb-1583/16:36:48-14:45
+			26-Feb-6712/17:07:12-10:00
+		]
 
 ===end-group===
 

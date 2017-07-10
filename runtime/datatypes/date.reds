@@ -26,7 +26,6 @@ date: context [
 	#define DATE_SET_MONTH(d month)	 (d and FFFF0FFFh or (month and 0Fh << 12))
 	#define DATE_SET_DAY(d day)		 (d and FFFFF07Fh or (day and 1Fh << 7))
 	#define DATE_SET_ZONE(d zone)	 (d and FFFFFF80h or (zone and 7Fh))
-	#define DATE_ADJUST_ZONE_SIGN(i) (i: 0 - i and 3Fh or 40h)
 	#define DATE_SET_ZONE_NEG(z) 	 (z or 40h)
 	
 	throw-error: func [spec [red-value!]][
@@ -68,7 +67,13 @@ date: context [
 			8 [float/push DATE_GET_SECONDS(t)]
 			9 [integer/push (date-to-days d) + 2 % 7 + 1]
 		   10 [integer/push get-yearday d]
-		   12 [integer/push (get-yearday d) / 7 + 1]
+		   12 [
+				wd: (Jan-1st-of d) + 3 % 7				;-- start the week on Sunday
+				days: 7 - wd
+				d: get-yearday d
+				d: either d <= days [1][d + wd - 1 / 7 + 1]
+				integer/push d
+			]
 		   13 [
 		   		wd: 0
 		   		d1: W1-1-of d :wd						;-- first day of first week
@@ -130,7 +135,7 @@ date: context [
 			base [integer!]
 	][
 		base: (date-to-days dt/date) - (Jan-1st-of 1970 << 16) * 86400
-		base + (dt/time / 1E9)
+		base + (as-integer dt/time / 1E9)
 	]
 	
 	make-in: func [
@@ -150,23 +155,6 @@ date: context [
 		cell/data2:  low
 		cell/data3:  high
 		as red-date! cell
-	]
-	
-	box: func [
-		year	[integer!]
-		month	[integer!]
-		day		[integer!]
-		time 	[float!]
-		zone	[integer!]
-		return: [red-date!]
-		/local
-			dt	[red-date!]
-	][
-		dt: as red-date! stack/arguments
-		dt/header: TYPE_DATE
-		dt/date: (year << 16) or (month << 12) or (day << 7) or zone
-		dt/time: time
-		dt
 	]
 	
 	push: func [
@@ -258,8 +246,8 @@ date: context [
 			mm	[float!]
 	][
 		h: DATE_GET_ZONE_HOURS(tz)
-		if DATE_GET_ZONE_SIGN(tz) [h: 0 - h]
 		m: DATE_GET_ZONE_MINUTES(tz)
+		if DATE_GET_ZONE_SIGN(tz) [h: 0 - h m: 0 - m]
 		hh: (as float! h) * time/h-factor
 		mm: (as float! m) * time/m-factor
 		either to-utc? [tm: tm - hh - mm][tm: tm + hh + mm]
@@ -297,7 +285,7 @@ date: context [
 	][
 		hz: DATE_GET_ZONE_HOURS(tz)
 		if DATE_GET_ZONE_SIGN(tz) [hz: 0 - hz]
-		htz: as-float hz
+		htz: (as-float hz) + ((as-float DATE_GET_ZONE_MINUTES(tz)) / 60.0)
 		ft: ft-ptr/value
 
 		h: ft / time/h-factor
@@ -394,6 +382,23 @@ date: context [
 		]
 		left
 	]
+	
+	set-month: func [
+		dt	[red-date!]
+		v	[integer!]
+		/local
+			y [integer!]
+			d [integer!]
+	][
+		d: dt/date
+		y: v - 1 / 12
+		if any [y < 0 v <= 0][y: y - 1]
+		y: DATE_GET_YEAR(d) + y
+		d: DATE_SET_YEAR(d y)
+		v: v % 12
+		if v <= 0 [v: 12 + v]
+		dt/date: DATE_SET_MONTH(d v)
+	]
 
 	set-time: func [
 		dt	 [red-date!]
@@ -409,7 +414,7 @@ date: context [
 		if utc? [tm: to-utc-time tm tz]
 		dd: normalize-time dd :tm tz
 		dt/date: days-to-date dd tz
-		dt/time: tm
+		dt/time: ROUND_TIME_DECIMALS(tm)
 	]
 	
 	set-timezone: func [
@@ -468,13 +473,12 @@ date: context [
 			dt/time: to-utc-time t v
 		]
 	]
-
-	;-- Actions --
-
-	make: func [
+	
+	create: func [
 		proto 	[red-value!]							;-- overwrite this slot with result
 		spec	[red-value!]
 		type	[integer!]
+		norm?	[logic!]								;-- yes: normalize, no: error on invalid input
 		return: [red-value!]
 		/local
 			value [red-value!]
@@ -495,14 +499,13 @@ date: context [
 			sec   [integer!]
 			zone  [integer!]
 			d	  [integer!]
+			h	  [integer!]
 			t	  [float!]
 			ftime [float!]
 			sec-t [float!]
 			zone-t[float!]
 			neg?  [logic!]
 	][
-		#if debug? = yes [if verbose > 0 [print-line "date/make"]]
-		
 		if TYPE_OF(spec) = TYPE_DATE [return spec]
 		
 		year:   0
@@ -517,7 +520,7 @@ date: context [
 		zone-t:	0.0
 		
 		switch TYPE_OF(spec) [
-			TYPE_BLOCK [
+			TYPE_ANY_LIST [
 				value: block/rs-head as red-block! spec
 				tail:  block/rs-tail as red-block! spec
 				
@@ -589,12 +592,46 @@ date: context [
 			default [throw-error spec]
 		]
 		if all [day >= 100 day > year][i: year year: day day: i]	;-- allow year to be first
+
+		dt: as red-date! stack/arguments
+		dt/header: TYPE_DATE
+		dt/date: DATE_SET_YEAR(0 year)
+		set-month dt month
+		dt/date: days-to-date day + date-to-days dt/date zone
+		set-time dt ftime yes
 		
-		ftime: to-utc-time ftime zone
-		dt: box year month day ftime zone
-		set-time dt dt/time no
-		d: days-to-date date-to-days dt/date 0
+		unless norm? [
+			d: dt/date
+			h: time/get-hours ftime
+			if any [cnt = 4 cnt = 5][min: time/get-minutes ftime]
+			if any [
+				year  <> DATE_GET_YEAR(d)
+				month <> DATE_GET_MONTH(d)
+				day   <> DATE_GET_DAY(d)
+				all [ftime <> 0.0 any [
+					h < 0 h > 23
+					min <> time/get-minutes dt/time
+				]]
+				all [ftime = 0.0 any [
+					hour <> time/get-hours dt/time
+					min  <> time/get-minutes dt/time
+				]]
+			][throw-error spec]
+		]
 		as red-value! dt
+	]
+
+	;-- Actions --
+
+	make: func [
+		proto 	[red-value!]							;-- overwrite this slot with result
+		spec	[red-value!]
+		type	[integer!]
+		return: [red-value!]
+	][
+		#if debug? = yes [if verbose > 0 [print-line "date/make"]]
+		
+		create proto spec type no
 	]
 
 	random: func [
@@ -604,10 +641,10 @@ date: context [
 		only?   [logic!]
 		return: [red-value!]
 		/local
-			y	[integer!]
 			d	[integer!]
 			n	[integer!]
 			dd	[integer!]
+			tz	[integer!]
 			s	[float!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "date/random"]]
@@ -617,14 +654,14 @@ date: context [
 			_random/srand d
 			dt/header: TYPE_UNSET
 		][
-			y: DATE_GET_YEAR(d)
-			n: _random/rand % y + 1
-			if y < 0 [n: 0 - n]
-			dd: _random/rand % (d and FFFFh)
-			dt/date: n << 16 or (dd and 80h) or DATE_GET_ZONE(d)
-
-			s: (as-float _random/rand) / 2147483647.0
-			dt/time: s * 24.0 * time/h-factor
+			dt/date: days-to-date _random/rand % date-to-days d DATE_GET_ZONE(d)
+			if dt/time <> 0.0 [
+				dt/date: DATE_SET_ZONE(dt/date _random/rand)
+				s: (as-float _random/rand) / 2147483647.0 * 3600.0
+				s: (floor s) / 3600.0
+				dt/time: s * 24.0 * time/h-factor
+				set-time dt dt/time yes
+			]
 		]
 		as red-value! dt
 	]
@@ -640,16 +677,18 @@ date: context [
 	][
 		#if debug? = yes [if verbose > 0 [print-line "date/to"]]
 
-		if TYPE_OF(spec) = TYPE_DATE [return spec]
-		
-		if TYPE_OF(spec) <> TYPE_INTEGER [
-			fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_DATE spec]
+		switch TYPE_OF(spec) [
+			TYPE_INTEGER [0]
+			TYPE_DATE	 [return spec]
+			TYPE_BLOCK	 [return create proto spec type yes]
+			default 	 [fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_DATE spec]]
 		]
 		int: as red-integer! spec
 		dt: as red-date! proto
 		dt/header: TYPE_DATE
 		dt/date: days-to-date (int/value / 86400) + Jan-1st-of 1970 << 16  0
 		dt/time: (as-float int/value % 86400) * 1E9
+		if int/value < 0 [set-time dt dt/time no]
 		as red-value! dt
 	]
 
@@ -686,6 +725,7 @@ date: context [
 			zone   [integer!]
 			year   [integer!]
 			sep	   [integer!]
+			saved   [float!]
 			sign   [byte!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "date/mold"]]
@@ -711,7 +751,7 @@ date: context [
 		string/append-char GET_BUFFER(buffer) sep
 		
 		formed: integer/form-signed year
-		part: either year > 0 [
+		part: either year >= 0 [
 			len: 4 - length? formed
 			if len > 0 [loop len [string/append-char GET_BUFFER(buffer) as-integer #"0"]]
 			part - 5									;-- 4 + separator
@@ -722,9 +762,11 @@ date: context [
 		
 		if dt/time <> 0.0 [
 			zone: DATE_GET_ZONE(d)
+			saved: dt/time
 			dt/time: to-local-time dt/time zone
 			string/append-char GET_BUFFER(buffer) as-integer #"/"
 			part: time/mold as red-time! dt buffer only? all? flat? arg part - 1 indent
+			dt/time: saved
 
 			if zone <> 0 [
 				sign: either as-logic zone >> 6 [#"-"][#"+"]
@@ -777,7 +819,6 @@ date: context [
 			field  [integer!]
 			sym	   [integer!]
 			v	   [integer!]
-			y	   [integer!]
 			d	   [integer!]
 			wd	   [integer!]
 			error? [logic!]
@@ -813,7 +854,7 @@ date: context [
 			]
 			default [error?: yes]
 		]
-		if error? [fire [TO_ERROR(script invalid-path) stack/arguments element]]
+		if error? [fire [TO_ERROR(script invalid-path) path element]]
 
 		either value <> null [
 			if any [all [1 <= field field <= 3] field = 9 field = 10 field = 12 field = 13][
@@ -824,16 +865,8 @@ date: context [
 			d: dt/date
 			switch field [
 				1 [dt/date: DATE_SET_YEAR(d v)]			;-- /year:
-				2 [										;-- /month:
-					y: v / 12
-					if any [y < 0 v = 0][y: y - 1]
-					y: DATE_GET_YEAR(d) + y
-					d: DATE_SET_YEAR(d y)
-					v: v % 12
-					if v <= 0 [v: 12 + v]
-					dt/date: DATE_SET_MONTH(d v)
-				]
-				3 [										 ;-- /day:
+				2 [set-month dt v]						;-- /month:
+				3 [										;-- /day:
 					dt/date: days-to-date v + date-to-days DATE_SET_DAY(d 0) DATE_GET_ZONE(d)
 				]
 				4 11 [set-timezone dt value field = 11] ;-- /zone: /timezone:
@@ -860,8 +893,11 @@ date: context [
 				]
 				12 [									;-- /week:
 					days: Jan-1st-of d
-					v: v * 7 - (days + 2 % 7 + 1)
-					dt/date: days-to-date v + days DATE_GET_ZONE(d)
+					if v > 1 [
+						wd: days + 3 % 7				;-- start the week on Sunday
+						days: days + (v - 2 * 7) + 7 - wd
+					]
+					dt/date: days-to-date days DATE_GET_ZONE(d)
 				]
 				13 [									;-- /isoweek:
 					wd: 0
@@ -869,6 +905,7 @@ date: context [
 				]
 				default [assert false]
 			]
+			object/check-owner as red-value! dt
 			value
 		][
 			value: push-field dt field
