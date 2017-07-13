@@ -126,26 +126,31 @@ system/view/VID: context [
 		]
 		top-left?: find [top left] align
 		axis:  pick [y x] dir = 'across
+		svmm: system/view/metrics/margins
 
 		foreach face pane [
 			unless face/options/at-offset [				;-- exclude absolute-positioned faces
-				unless top-left? [
-					offset: max-sz - face/size/:axis
-					if find [center middle] align [offset: to integer! round offset / 2.0]
-					face/offset/:axis: face/offset/:axis + offset
-				]
-				if all [								;-- account for hard margins
-					edge?
-					type: any [face/options/class face/type]
-					mar: select system/view/metrics/margins type
-				][
-					face/offset/:axis: face/offset/:axis + any [
-						either dir = 'across [
-							switch align [top [negate mar/2/x] middle [0] bottom [mar/2/y]]
-						][
-							switch align [left [negate mar/1/x] center [0] right [mar/1/y]]
+				offset: either top-left? [0][max-sz - face/size/:axis]
+				mar: select system/view/metrics/margins face/type
+				if type: face/options/class [mar: select mar type]
+				if mar [
+					offset: offset + either dir = 'across [
+						switch align [
+							top	   [negate mar/2/x]
+							middle [to integer! round mar/2/x + mar/2/y / 2.0]
+							bottom [mar/2/y]
+						]
+					][
+						switch align [
+							left   [negate mar/1/x]
+							center [to integer! round mar/1/x + mar/1/y / 2.0]
+							right  [mar/1/y]
 						]
 					]
+				]
+				if offset <> 0 [
+					if find [center middle] align [offset: to integer! round offset / 2.0]
+					face/offset/:axis: face/offset/:axis + offset
 				]
 			]
 		]
@@ -272,7 +277,7 @@ system/view/VID: context [
 				| 'loose	  (add-option opts [drag-on: 'down])
 				| 'all-over   (set-flag opts 'flags 'all-over)
 				| 'hidden	  (opts/visible?: no)
-				| 'disabled	  (opts/enable?: no)
+				| 'disabled	  (opts/enabled?: no)
 				| 'select	  (opts/selected: fetch-argument integer! spec)
 				| 'rate		  (opts/rate: fetch-argument rate! spec)
 				   opt [rate! 'now (opts/now?: yes spec: next spec)]
@@ -471,7 +476,7 @@ system/view/VID: context [
 		top-left: bound: cursor: origin: spacing: pick [0x0 10x10] tight
 		
 		opts: object [
-			type: offset: size: size-x: text: color: enable?: visible?: selected: image: 
+			type: offset: size: size-x: text: color: enabled?: visible?: selected: image: 
 			rate: font: flags: options: para: data: extra: actors: draw: now?: init: none
 		]
 		if empty? opt-words: [][append opt-words words-of opts] ;-- static cache
@@ -587,8 +592,11 @@ system/view/VID: context [
 					throw-error spec
 				]
 				if style/template/type = 'window [throw-error spec]
+				
 				face: make face! copy/deep style/template
+				if h: select system/view/metrics/def-heights face/type [face/size/y: h]
 				face/parent: panel
+				
 				spec: fetch-options face opts style spec local-styles to-logic styling?
 				if style/init [do bind style/init 'face]
 				

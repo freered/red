@@ -277,13 +277,17 @@ image: context [
 				]
 			]
 		][
-			either type = TYPE_TUPLE [
-				tp: as red-tuple! bin
-				color: tp/array1
-				if TUPLE_SIZE?(tp) = 3 [color: color and 00FFFFFFh]
-			][
-				int: as red-integer! bin
-				color: int/value
+			switch type [
+				TYPE_TUPLE [
+					tp: as red-tuple! bin
+					color: tp/array1
+					if TUPLE_SIZE?(tp) = 3 [color: color and 00FFFFFFh]
+				]
+				TYPE_INTEGER [
+					int: as red-integer! bin
+					color: int/value
+				]
+				default [fire [TO_ERROR(script invalid-arg) bin]]
 			]
 			either method = EXTRACT_ARGB [
 				mask: 255 - (color >>> 24) << 24
@@ -433,21 +437,21 @@ image: context [
 		/local
 			ret [red-logic!]
 	][
-		if TYPE_OF(spec) = TYPE_IMAGE [					;-- copy it
-			return copy as red-image! spec proto null yes null
-		]
-		#either modules contains 'View [
-			spec: stack/push spec						;-- store spec to avoid corrution (#2460)
-			#call [face? spec]
-			ret: as red-logic! stack/arguments
-			either ret/value [
-				return exec/gui/OS-to-image as red-object! spec
-			][
-				fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_IMAGE spec]
+		switch TYPE_OF(spec) [
+			TYPE_IMAGE [					;-- copy it
+				return copy as red-image! spec proto null yes null
 			]
-		][
-			fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_IMAGE spec]
+			TYPE_OBJECT [
+				#either modules contains 'View [
+					spec: stack/push spec						;-- store spec to avoid corrution (#2460)
+					#call [face? spec]
+					ret: as red-logic! stack/arguments
+					if ret/value [return exec/gui/OS-to-image as red-object! spec]
+				][0]
+			]
+			default [0]
 		]
+		fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_IMAGE spec]
 		as red-image! proto
 	]
 
