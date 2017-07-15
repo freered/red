@@ -868,6 +868,12 @@ size?: make native! [[
 	#get-definition NAT_SIZE?
 ]
 
+browse: make native! [[
+		"Open web browser to a URL or file mananger to a local file."
+		url 	[url! file!]
+	]
+	#get-definition NAT_BROWSE
+
 detab: make native! [[
 		"Converts tabs in a string to spaces. (tab size 4)"
 		string		[any-string! char!]
@@ -884,4 +890,5 @@ entab: make native! [[
 			value [integer!]
 	]
 	#get-definition NAT_ENTAB
+
 ]

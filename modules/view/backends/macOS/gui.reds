@@ -601,8 +601,10 @@ change-color: func [
 	/local
 		clr  [integer!]
 		set? [logic!]
+		t	 [integer!]
 ][
-	if TYPE_OF(color) <> TYPE_TUPLE [exit]
+	t: TYPE_OF(color)
+	if all [t <> TYPE_NONE t <> TYPE_TUPLE][exit]
 	if transparent-color? color [
 		objc_msgSend [hWnd sel_getUid "setDrawsBackground:" no]
 		exit
@@ -611,22 +613,34 @@ change-color: func [
 	case [
 		type = area [
 			hWnd: objc_msgSend [hWnd sel_getUid "documentView"]
-			set-caret-color hWnd color/array1
+			clr: either t = TYPE_NONE [00FFFFFFh][color/array1]
+			set-caret-color hWnd clr
+			if t = TYPE_NONE [clr: objc_msgSend [objc_getClass "NSColor" sel_getUid "textBackgroundColor"]]
 		]
 		type = text [
-			objc_msgSend [hWnd sel_getUid "setDrawsBackground:" yes]
+			if t = TYPE_NONE [
+				clr: objc_msgSend [objc_getClass "NSColor" sel_getUid "controlColor"]
+				set?: no
+			]
+			objc_msgSend [hWnd sel_getUid "setDrawsBackground:" set?]
 		]
 		any [type = check type = radio][
 			hWnd: objc_msgSend [hWnd sel_getUid "cell"]
+			if t = TYPE_NONE [clr: objc_msgSend [objc_getClass "NSColor" sel_getUid "controlColor"]]
 		]
-		any [type = field type = window][0]				;-- no special process
+		type = field [
+			if t = TYPE_NONE [clr: objc_msgSend [objc_getClass "NSColor" sel_getUid "textBackgroundColor"]]
+		]
+		type = window [
+			if t = TYPE_NONE [clr: objc_msgSend [objc_getClass "NSColor" sel_getUid "windowBackgroundColor"]]
+		]
 		true [
 			set?: no
 			objc_msgSend [hWnd sel_getUid "setNeedsDisplay:" yes]
 		]
 	]
 	if set? [
-		clr: to-NSColor color
+		if t = TYPE_TUPLE [clr: to-NSColor color]
 		objc_msgSend [hWnd sel_getUid "setBackgroundColor:" clr]
 	]
 ]
@@ -1189,6 +1203,7 @@ make-area: func [
 	objc_msgSend [obj sel_getUid "setHorizontallyResizable:" yes]
 	objc_msgSend [obj sel_getUid "setMinSize:" rc/x rc/h]
 	objc_msgSend [obj sel_getUid "setMaxSize:" rc/y rc/y]
+	objc_msgSend [obj sel_getUid "setAutomaticQuoteSubstitutionEnabled:" no]
 	;objc_msgSend [obj sel_getUid "setAutoresizingMask:" NSViewWidthSizable]
 
 	tbox: objc_msgSend [obj sel_getUid "textContainer"]
@@ -1958,7 +1973,7 @@ OS-to-image: func [
 	word: as red-word! get-node-facet face/ctx FACE_OBJ_TYPE
 	screen?: screen = symbol/resolve word/symbol
 	either screen? [
-		bmp: CGWindowListCreateImage FF800000h FF800000h 7F800000h 7F800000h 1 0 0		;-- -INF & INF
+		bmp: CGWindowListCreateImage 0 0 7F800000h 7F800000h 1 0 0		;-- INF
 		ret: image/init-image as red-image! stack/push* OS-image/load-cgimage as int-ptr! bmp
 	][
 		view: as-integer face-handle? face
