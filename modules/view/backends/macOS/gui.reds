@@ -1449,6 +1449,7 @@ parse-common-opts: func [
 		hcur	[integer!]
 		nsimg	[integer!]
 		btn?	[logic!]
+		pt		[CGPoint! value]
 ][
 	btn?: yes
 	if TYPE_OF(options) = TYPE_BLOCK [
@@ -1463,12 +1464,14 @@ parse-common-opts: func [
 					either TYPE_OF(w) = TYPE_IMAGE [
 						img: as red-image! w
 						nsimg: objc_msgSend [
-							objc_getClass "NSImage" sel_alloc
+							OBJC_ALLOC("NSImage")
 							sel_getUid "initWithCGImage:size:" OS-image/to-cgimage img 0 0
 						]
+						pt/x: as float32! IMAGE_WIDTH(img/size) / 2
+						pt/y: as float32! IMAGE_HEIGHT(img/size) / 2
 						hcur: objc_msgSend [
-							objc_getClass "NSCursor" sel_alloc
-							sel_getUid "initWithImage:hotSpot:" nsimg 0 0
+							OBJC_ALLOC("NSCursor")
+							sel_getUid "initWithImage:hotSpot:" nsimg pt/x pt/y
 						]
 						objc_msgSend [nsimg sel_release]
 					][
