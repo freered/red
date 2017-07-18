@@ -37,6 +37,26 @@ size-text: function [
 	system/view/platform/size-text face text
 ]
 
+metrics?: function [
+	"Returns a pair! value in the type metrics for the argument face"
+	face [object!]			"Face object to query"
+	type [word!]			"Metrics type: 'paddings or 'margins"
+	/total					"Return the addition of metrics along an axis"
+		axis [word!]		"Axis to use for addition: 'x or 'y"
+][
+	res: select system/view/metrics/:type face/type
+	all [
+		face/options
+		type: face/options/class
+		res: find res type
+		res: next res
+	]
+	either total [
+		axis: any [select [x 1 y 2] axis 1]
+		res/:axis/x + res/:axis/y
+	][res]
+]
+
 set-flag: function [
 	face  [object!]
 	facet [word!]
