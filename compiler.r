@@ -1540,7 +1540,7 @@ red: context [
 	]
 	
 	encode-UTC-time: func [time [time! none!] zone [time! none!]][
-		 1E9 * to decimal! either time [either zone [time - zone][time]][0.0]
+		to decimal! either time [either zone [time - zone][time]][0.0]
 	]
 	
 	encode-date: func [value [date!] /with zone /local date][
@@ -1669,7 +1669,7 @@ red: context [
 				]
 				time? :value [
 					emit 'time/push
-					emit (to decimal! value) * 1E9
+					emit to decimal! value
 					insert-lf -2
 				]
 				dt-special? [
@@ -1938,7 +1938,7 @@ red: context [
 		
 		if proto [
 			if body? [inherit-functions obj last proto]
-			emit reduce ['object/duplicate select objects last proto ctx]
+			emit reduce ['object/duplicate select objects last proto ctx 'true]
 			insert-lf -3
 		]
 		if all [not body? not passive][
