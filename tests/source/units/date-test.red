@@ -167,7 +167,6 @@ Red [
 	--test-- "make10"	--assert error? try [make date! [1981 2 29]]
 	--test-- "make11"	--assert error? try [make date! [1 2 2017 23 70 0 4:30]]
 	--test-- "make12"	--assert error? try [make date! [1 2 2017 23:70:0 4:30]]
-	--test-- "make13"	--assert error? try [make date! [1 2 2017 23:20:70 4:30]]
 	
 	--test-- "make14"	--assert 3-Feb-1978				  = make date! [3 2 1978]
 	--test-- "make15"	--assert 3-Feb-1978/5:20:30+4:00  = make date! [3 2 1978 5 20 30 4]
@@ -634,6 +633,7 @@ Red [
 	--test-- "math-23"	--assert -13:00 = difference d 5-Jul-2017/12:41:40-5:00
 	--test-- "math-24"	--assert -3259:18:20 = round/to difference d 18-11-2017 1E-3
 	--test-- "math-25"	--assert -29563:18:20 = round/to difference d 18-11-2020 1E-3
+	--test-- "math-26"	--assert 0.000123 = to float! difference 1-1-70/0:0:0.000123 1-Jan-1970
 	;difference d 5-Jul-2017/12:41:40-5:15
 	
 	--test-- "math-30"	--assert  1 + d = 6-Jul-2017/12:41:40+08:00
@@ -662,6 +662,8 @@ Red [
 	--test-- "conv-20"	--assert 3-Mar-1973/9:46:40 = to-date reduce [1970 1 1 to-time 100000000 0]
 	--test-- "conv-21"	--assert 1-Mar-1981 = to-date [1981 2 29]
 	--test-- "conv-22"	--assert 2-Feb-2017/0:10:00+04:30 = to date! [1 2 2017 23 70 0 4:30]
+
+	--test-- "conv-23"	--assert 1499299200 = to integer! 5-Jul-2017/23:59:59.999999
 
 ===end-group===
 

@@ -58,11 +58,13 @@ date: context [
 			3 [integer/push DATE_GET_MONTH(d)]
 			4 [integer/push DATE_GET_DAY(d)]
 			5 12 [
-				t: (as-float DATE_GET_ZONE_HOURS(d)) * 3600.0
-					+ ((as-float DATE_GET_ZONE_MINUTES(d)) * 60.0)
-				
-				if DATE_GET_ZONE_SIGN(d) [t: 0.0 - t]
-				time/push t
+				either DATE_GET_TIME_FLAG(d) [
+					t: (as-float DATE_GET_ZONE_HOURS(d)) * 3600.0
+						+ ((as-float DATE_GET_ZONE_MINUTES(d)) * 60.0)
+
+					if DATE_GET_ZONE_SIGN(d) [t: 0.0 - t]
+					time/push t
+				][none/push]
 			]
 			6 [either DATE_GET_TIME_FLAG(d) [time/push t][none/push]]
 			7 [integer/push time/get-hours t]
@@ -190,7 +192,7 @@ date: context [
 			f	[float!]
 	][
 		;@@ use int64 once we have it
-		f: 10000.0 * days
+		f: 10000.0 * as-float days
 		y: as-integer (f + 14780.0 / 3652425.0)
 
 		dd: days - (365 * y + (y / 4) - (y / 100) + (y / 400))
@@ -583,6 +585,9 @@ date: context [
 						i: either all [cnt = 5 min <> 0][min][zone]
 						mn: 0
 					]
+					if all [cnt = 7 zone-t = 0.0 any [zone > 15 zone < -15]][
+						throw-error spec
+					]
 					neg?: either i < 0 [i: 0 - i yes][no]
 					zone: i << 2 and 7Fh or mn
 					if neg? [zone: DATE_SET_ZONE_NEG(zone)]
@@ -600,8 +605,8 @@ date: context [
 		dt/header: TYPE_DATE
 		dt/date: DATE_SET_YEAR(0 year)
 		set-month dt month
-		dt/date: days-to-date day + date-to-days dt/date zone cnt > 3
-		set-time dt ftime yes
+		dt/date: days-to-date day + date-to-days dt/date 0 cnt > 3
+		set-time dt ftime no
 		
 		unless norm? [
 			d: dt/date
@@ -621,6 +626,9 @@ date: context [
 				]]
 			][throw-error spec]
 		]
+		dt/date: DATE_SET_ZONE(dt/date zone)
+		set-time dt dt/time yes
+		
 		as red-value! dt
 	]
 
@@ -683,10 +691,10 @@ date: context [
 		#if debug? = yes [if verbose > 0 [print-line "date/to"]]
 
 		switch TYPE_OF(spec) [
-			TYPE_INTEGER [0]
-			TYPE_DATE	 [return spec]
-			TYPE_BLOCK	 [return create proto spec type yes]
-			default 	 [fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_DATE spec]]
+			TYPE_INTEGER  [0]
+			TYPE_DATE	  [return spec]
+			TYPE_ANY_LIST [return create proto spec type yes]
+			default 	  [fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_DATE spec]]
 		]
 		int: as red-integer! spec
 		dt: as red-date! proto
