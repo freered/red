@@ -106,6 +106,12 @@ redc: context [
 				]
 			]
 		][												;-- Linux (default)
+			cpuinfo: attempt [read %/proc/cpuinfo]
+			either cpuinfo [
+				SSE3?: parse cpuinfo [thru "flags" to "sse3" to end]
+			][
+				fail "Can't read /proc/cpuinfo"
+			]
 			any [
 				exists? libc: %libc.so.6
 				exists? libc: %/lib32/libc.so.6
@@ -668,6 +674,7 @@ redc: context [
 			any [
 				  ["-c" | "--compile"]			(type: 'exe)
 				| ["-r" | "--release"]			(type: 'exe opts/dev-mode?: no)
+				| ["-e" | "--encap"]			(opts/encap?: yes)
 				| ["-d" | "--debug-stabs" | "--debug"]	(opts/debug?: yes)
 				| ["-o" | "--output"]			[set output  skip | (fail "Missing output filename")]
 				| ["-t" | "--target"]			[set target  skip | (fail "Missing target")] (target?: yes)

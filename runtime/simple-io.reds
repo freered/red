@@ -683,13 +683,13 @@ simple-io: context [
 		size	[integer!]
 		return:	[integer!]
 		/local
-			read-sz [integer!]
-			res		[integer!]
+			len [integer!]
+			res [integer!]
 	][
 		#either OS = 'Windows [
-			read-sz: -1
-			res: ReadFile file buffer size :read-sz null
-			res: either zero? res [-1][1]
+			len: 0
+			res: ReadFile file buffer size :len null
+			res: either zero? res [-1][len]
 		][
 			res: _read file buffer size
 		]
@@ -708,7 +708,7 @@ simple-io: context [
 		#either OS = 'Windows [
 			len: 0
 			ret: WriteFile file data size :len null
-			ret: either zero? ret [-1][1]
+			ret: either zero? ret [-1][len]
 		][
 			ret: _write file data size
 		]
@@ -780,6 +780,17 @@ simple-io: context [
 		if file < 0 [return none-value]
 
 		size: file-size? file
+
+		if zero? size [				;-- /proc filesystem give 0 size
+			buffer: allocate 4096
+			while [
+				len: read-data file buffer 4096
+				len > 0
+			][
+				size: size + len
+			]
+			free buffer
+		]
 
 		if size <= 0 [
 			close-file file
@@ -1118,7 +1129,7 @@ simple-io: context [
 			]
 			true [
 				len: 0
-				actions/mold as red-value! data buffer no yes no null 0 0
+				actions/mold as red-value! data buffer no no no null 0 0
 				buf: value-to-buffer as red-value! buffer part :len binary? null
 				string/rs-reset buffer
 			]

@@ -304,6 +304,8 @@ Red/System [
 #define WM_EXITSIZEMOVE		0232h
 #define WM_IME_SETCONTEXT	0281h
 #define WM_IME_NOTIFY		0282h
+#define WM_MOUSELEAVE		02A3h
+#define WM_DPICHANGED		02E0h
 #define WM_COPY				0301h
 #define WM_PASTE			0302h
 #define WM_CLEAR			0303h
@@ -601,6 +603,13 @@ tagTEXTMETRIC: alias struct! [
 	tmStruckOut			[byte!]
 	tmPitchAndFamily	[byte!]
 	tmCharSet			[byte!]
+]
+
+tagTRACKMOUSEEVENT: alias struct! [
+	cbSize		[integer!]
+	dwFlags		[integer!]
+	hwndTrack	[handle!]
+	dwHoverTime	[integer!]
 ]
 
 tagNMHDR: alias struct! [
@@ -921,6 +930,14 @@ DwmIsCompositionEnabled!: alias function! [
 	return:		[integer!]
 ]
 
+GetDpiForMonitor!: alias function! [
+	hmonitor	[handle!]
+	dpiType		[integer!]
+	dpiX		[int-ptr!]
+	dpiY		[int-ptr!]
+	return:		[integer!]
+]
+
 XFORM!: alias struct! [
     eM11        [float32!]
     eM12        [float32!]
@@ -992,6 +1009,22 @@ XFORM!: alias struct! [
 		]
 	]
 	"User32.dll" stdcall [
+		TrackMouseEvent: "TrackMouseEvent" [
+			EventTrack	[tagTRACKMOUSEEVENT]
+			return:		[logic!]
+		]
+		RedrawWindow: "RedrawWindow" [
+			hWnd		[handle!]
+			lprcUpdate	[RECT_STRUCT]
+			hrgnUpdate	[handle!]
+			flags		[integer!]
+			return:		[logic!]
+		]
+		MonitorFromPoint: "MonitorFromPoint" [
+			pt			[tagPOINT value]
+			flags		[integer!]
+			return:		[handle!]
+		]
 		GetKeyboardLayout: "GetKeyboardLayout" [
 			idThread	[integer!]
 			return:		[integer!]
@@ -2698,6 +2731,13 @@ XFORM!: alias struct! [
 			himl		[integer!]
 			hbmImage	[integer!]
 			hbmMask		[integer!]
+			return:		[integer!]
+		]
+		LBItemFromPt: "LBItemFromPt" [
+			hLB			[handle!]
+			x			[integer!]
+			y			[integer!]
+			bAutoScroll [logic!]
 			return:		[integer!]
 		]
 	]

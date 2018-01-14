@@ -34,6 +34,12 @@ set-type: func [										;@@ convert to macro?
 	cell/header: cell/header and type-mask or type
 ]
 
+clear-newline: func [
+	cell [red-value!]
+][
+	cell/header: cell/header and flag-nl-mask
+]
+
 alloc-at-tail: func [
 	blk		[red-block!]
 	return: [cell!]
@@ -579,6 +585,7 @@ words: context [
 	_quote: 		as red-word! 0
 	_collect: 		as red-word! 0
 	_set: 			as red-word! 0
+	_case:			as red-word! 0
 	
 	;-- modifying actions
 	_change:		as red-word! 0
@@ -774,6 +781,7 @@ words: context [
 		_quote: 		_context/add-global quote
 		_collect: 		_context/add-global collect
 		_set: 			_context/add-global set
+		_case:			_context/add-global case*
 		
 		;-- modifying actions
 		_change:		word/load "change"
